@@ -16,10 +16,24 @@ type Trabajador = {
   fecha_ingreso: string | null;
   fecha_salida: string | null;
   estado: string;
-  tipo_pago: string | null;
-  salario_base: number | null;
-  moneda: string | null;
+  tipo_pago: string;
+  salario_base: number;
+  moneda: string;
   observaciones: string | null;
+  created_at: string;
+};
+
+type ArchivoTrabajador = {
+  id: string;
+  finca_id: string;
+  trabajador_id: string;
+  tipo: string;
+  nombre_archivo: string;
+  ruta_storage: string;
+  mime_type: string | null;
+  tamano_bytes: number | null;
+  descripcion: string | null;
+  registrado_por: string | null;
   created_at: string;
 };
 
@@ -48,22 +62,44 @@ const formularioInicial: Formulario = {
   fecha_salida: "",
   estado: "activo",
   tipo_pago: "mensual",
-  salario_base: "",
+  salario_base: "0",
   moneda: "BOB",
   observaciones: "",
 };
+
+const tiposArchivo = [
+  { valor: "foto", texto: "Foto del trabajador" },
+  { valor: "ci_anverso", texto: "CI - Anverso" },
+  { valor: "ci_reverso", texto: "CI - Reverso" },
+  { valor: "licencia", texto: "Licencia" },
+  { valor: "contrato", texto: "Contrato" },
+  { valor: "certificado", texto: "Certificado" },
+  { valor: "otro", texto: "Otro documento" },
+];
 
 export default function PersonalPage() {
   const router = useRouter();
 
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
+  const [subiendoArchivo, setSubiendoArchivo] = useState(false);
+
   const [fincaId, setFincaId] = useState("");
+  const [usuarioId, setUsuarioId] = useState("");
+
   const [trabajadores, setTrabajadores] = useState<Trabajador[]>([]);
+  const [archivos, setArchivos] = useState<ArchivoTrabajador[]>([]);
+
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [editandoId, setEditandoId] = useState<string | null>(null);
+
   const [formulario, setFormulario] =
     useState<Formulario>(formularioInicial);
+
+  const [tipoArchivo, setTipoArchivo] = useState("foto");
+  const [descripcionArchivo, setDescripcionArchivo] = useState("");
+  const [archivoSeleccionado, setArchivoSeleccionado] =
+    useState<File | null>(null);
 
   const [error, setError] = useState("");
   const [mensaje, setMensaje] = useState("");
@@ -98,6 +134,7 @@ export default function PersonalPage() {
       return;
     }
 
+    setUsuarioId(user.id);
     setFincaId(usuario.finca_id);
 
     await cargarTrabajadores(usuario.finca_id);
@@ -131,42 +168,67 @@ export default function PersonalPage() {
       .order("nombre", { ascending: true });
 
     if (errorCarga) {
-      setError(
-        `Error al cargar personal: ${errorCarga.message}`
-      );
+      setError(`Error al cargar personal: ${errorCarga.message}`);
       return;
     }
 
     setTrabajadores((data || []) as Trabajador[]);
   };
 
-  const totalActivos = useMemo(() => {
-    return trabajadores.filter(
-      (trabajador) => trabajador.estado === "activo"
-    ).length;
-  }, [trabajadores]);
+  const cargarArchivos = async (trabajadorId: string) => {
+    const { data, error: errorArchivos } = await supabase
+      .from("gan_trabajador_archivos")
+      .select("*")
+      .eq("trabajador_id", trabajadorId)
+      .order("created_at", { ascending: false });
 
-  const totalVacaciones = useMemo(() => {
-    return trabajadores.filter(
-      (trabajador) => trabajador.estado === "vacaciones"
-    ).length;
-  }, [trabajadores]);
+    if (errorArchivos) {
+      setError(
+        `Error al cargar documentos: ${errorArchivos.message}`
+      );
+      return;
+    }
 
-  const totalLicencia = useMemo(() => {
-    return trabajadores.filter(
-      (trabajador) => trabajador.estado === "licencia"
-    ).length;
-  }, [trabajadores]);
+    setArchivos((data || []) as ArchivoTrabajador[]);
+  };
+
+  const totalActivos = useMemo(
+    () =>
+      trabajadores.filter(
+        (trabajador) => trabajador.estado === "activo"
+      ).length,
+    [trabajadores]
+  );
+
+  const totalVacaciones = useMemo(
+    () =>
+      trabajadores.filter(
+        (trabajador) => trabajador.estado === "vacaciones"
+      ).length,
+    [trabajadores]
+  );
+
+  const totalLicencia = useMemo(
+    () =>
+      trabajadores.filter(
+        (trabajador) => trabajador.estado === "licencia"
+      ).length,
+    [trabajadores]
+  );
 
   const abrirNuevo = () => {
     setFormulario(formularioInicial);
     setEditandoId(null);
+    setArchivos([]);
+    setTipoArchivo("foto");
+    setDescripcionArchivo("");
+    setArchivoSeleccionado(null);
     setError("");
     setMensaje("");
     setMostrarFormulario(true);
   };
 
-  const abrirEditar = (trabajador: Trabajador) => {
+  const abrirEditar = async (trabajador: Trabajador) => {
     setFormulario({
       nombre: trabajador.nombre || "",
       apellido: trabajador.apellido || "",
@@ -177,18 +239,20 @@ export default function PersonalPage() {
       fecha_salida: trabajador.fecha_salida || "",
       estado: trabajador.estado || "activo",
       tipo_pago: trabajador.tipo_pago || "mensual",
-      salario_base:
-        trabajador.salario_base !== null
-          ? String(trabajador.salario_base)
-          : "",
+      salario_base: String(trabajador.salario_base ?? 0),
       moneda: trabajador.moneda || "BOB",
       observaciones: trabajador.observaciones || "",
     });
 
     setEditandoId(trabajador.id);
+    setTipoArchivo("foto");
+    setDescripcionArchivo("");
+    setArchivoSeleccionado(null);
     setError("");
     setMensaje("");
     setMostrarFormulario(true);
+
+    await cargarArchivos(trabajador.id);
 
     window.scrollTo({
       top: 0,
@@ -200,6 +264,9 @@ export default function PersonalPage() {
     setMostrarFormulario(false);
     setEditandoId(null);
     setFormulario(formularioInicial);
+    setArchivos([]);
+    setArchivoSeleccionado(null);
+    setDescripcionArchivo("");
     setError("");
   };
 
@@ -227,12 +294,9 @@ export default function PersonalPage() {
       return;
     }
 
-    const salario =
-      formulario.salario_base.trim() === ""
-        ? null
-        : Number(formulario.salario_base);
+    const salario = Number(formulario.salario_base || 0);
 
-    if (salario !== null && (Number.isNaN(salario) || salario < 0)) {
+    if (Number.isNaN(salario) || salario < 0) {
       setError("El salario debe ser un número igual o mayor a 0.");
       return;
     }
@@ -271,21 +335,25 @@ export default function PersonalPage() {
       }
 
       setMensaje("Trabajador actualizado correctamente.");
-    } else {
-      const { error: errorGuardar } = await supabase
-        .from("gan_trabajadores")
-        .insert(datos);
 
-      if (errorGuardar) {
-        setError(
-          `Error al registrar trabajador: ${errorGuardar.message}`
-        );
-        setGuardando(false);
-        return;
-      }
-
-      setMensaje("Trabajador registrado correctamente.");
+      await cargarTrabajadores(fincaId);
+      setGuardando(false);
+      return;
     }
+
+    const { error: errorGuardar } = await supabase
+      .from("gan_trabajadores")
+      .insert(datos);
+
+    if (errorGuardar) {
+      setError(
+        `Error al registrar trabajador: ${errorGuardar.message}`
+      );
+      setGuardando(false);
+      return;
+    }
+
+    setMensaje("Trabajador registrado correctamente.");
 
     await cargarTrabajadores(fincaId);
 
@@ -295,17 +363,182 @@ export default function PersonalPage() {
     setGuardando(false);
   };
 
-  const nombreCompleto = (trabajador: Trabajador) => {
-    return [trabajador.nombre, trabajador.apellido]
+  const subirDocumento = async () => {
+    setError("");
+    setMensaje("");
+
+    if (!editandoId) {
+      setError(
+        "Primero debes guardar al trabajador antes de agregar documentos."
+      );
+      return;
+    }
+
+    if (!archivoSeleccionado) {
+      setError("Selecciona un archivo.");
+      return;
+    }
+
+    if (archivoSeleccionado.size > 10 * 1024 * 1024) {
+      setError("El archivo no puede superar los 10 MB.");
+      return;
+    }
+
+    const tiposPermitidos = [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "application/pdf",
+    ];
+
+    if (!tiposPermitidos.includes(archivoSeleccionado.type)) {
+      setError(
+        "Solo se permiten imágenes JPG, PNG, WEBP o documentos PDF."
+      );
+      return;
+    }
+
+    setSubiendoArchivo(true);
+
+    const extension =
+      archivoSeleccionado.name.split(".").pop()?.toLowerCase() || "archivo";
+
+    const nombreSeguro = `${tipoArchivo}-${Date.now()}.${extension}`;
+
+    const rutaStorage =
+      `${fincaId}/${editandoId}/${nombreSeguro}`;
+
+    const { error: errorStorage } = await supabase.storage
+      .from("gan-personal")
+      .upload(rutaStorage, archivoSeleccionado, {
+        cacheControl: "3600",
+        upsert: false,
+        contentType: archivoSeleccionado.type,
+      });
+
+    if (errorStorage) {
+      setError(
+        `Error al subir el archivo: ${errorStorage.message}`
+      );
+      setSubiendoArchivo(false);
+      return;
+    }
+
+    const { error: errorRegistro } = await supabase
+      .from("gan_trabajador_archivos")
+      .insert({
+        finca_id: fincaId,
+        trabajador_id: editandoId,
+        tipo: tipoArchivo,
+        nombre_archivo: archivoSeleccionado.name,
+        ruta_storage: rutaStorage,
+        mime_type: archivoSeleccionado.type,
+        tamano_bytes: archivoSeleccionado.size,
+        descripcion: descripcionArchivo.trim() || null,
+        registrado_por: usuarioId,
+      });
+
+    if (errorRegistro) {
+      await supabase.storage
+        .from("gan-personal")
+        .remove([rutaStorage]);
+
+      setError(
+        `Error al registrar el documento: ${errorRegistro.message}`
+      );
+      setSubiendoArchivo(false);
+      return;
+    }
+
+    setArchivoSeleccionado(null);
+    setDescripcionArchivo("");
+    setTipoArchivo("foto");
+
+    const input = document.getElementById(
+      "archivo-personal"
+    ) as HTMLInputElement | null;
+
+    if (input) {
+      input.value = "";
+    }
+
+    await cargarArchivos(editandoId);
+
+    setMensaje("Documento agregado correctamente.");
+    setSubiendoArchivo(false);
+  };
+
+  const abrirDocumento = async (archivo: ArchivoTrabajador) => {
+    setError("");
+
+    const { data, error: errorUrl } = await supabase.storage
+      .from("gan-personal")
+      .createSignedUrl(archivo.ruta_storage, 60);
+
+    if (errorUrl || !data?.signedUrl) {
+      setError(
+        `No se pudo abrir el documento: ${
+          errorUrl?.message || "Error desconocido"
+        }`
+      );
+      return;
+    }
+
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  };
+
+  const eliminarDocumento = async (
+    archivo: ArchivoTrabajador
+  ) => {
+    const confirmar = window.confirm(
+      `¿Eliminar "${archivo.nombre_archivo}"?`
+    );
+
+    if (!confirmar) return;
+
+    setError("");
+    setMensaje("");
+
+    const { error: errorStorage } = await supabase.storage
+      .from("gan-personal")
+      .remove([archivo.ruta_storage]);
+
+    if (errorStorage) {
+      setError(
+        `No se pudo eliminar el archivo: ${errorStorage.message}`
+      );
+      return;
+    }
+
+    const { error: errorRegistro } = await supabase
+      .from("gan_trabajador_archivos")
+      .delete()
+      .eq("id", archivo.id)
+      .eq("finca_id", fincaId);
+
+    if (errorRegistro) {
+      setError(
+        `El archivo fue eliminado del almacenamiento, pero hubo un error al eliminar su registro: ${errorRegistro.message}`
+      );
+      return;
+    }
+
+    if (editandoId) {
+      await cargarArchivos(editandoId);
+    }
+
+    setMensaje("Documento eliminado correctamente.");
+  };
+
+  const nombreCompleto = (trabajador: Trabajador) =>
+    [trabajador.nombre, trabajador.apellido]
       .filter(Boolean)
       .join(" ");
-  };
 
   const mostrarFecha = (fecha: string | null) => {
     if (!fecha) return "—";
 
     const [anio, mes, dia] = fecha.split("-");
-
     return `${dia}/${mes}/${anio}`;
   };
 
@@ -356,14 +589,29 @@ export default function PersonalPage() {
     }
   };
 
+  const etiquetaTipoArchivo = (tipo: string) => {
+    return (
+      tiposArchivo.find((item) => item.valor === tipo)?.texto ||
+      tipo
+    );
+  };
+
+  const mostrarTamano = (bytes: number | null) => {
+    if (!bytes) return "—";
+
+    if (bytes < 1024 * 1024) {
+      return `${(bytes / 1024).toFixed(0)} KB`;
+    }
+
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
   if (cargando) {
     return (
       <>
         <Sidebar />
         <main style={estilos.main}>
-          <div style={estilos.cargando}>
-            Cargando personal...
-          </div>
+          <div style={estilos.cargando}>Cargando personal...</div>
         </main>
       </>
     );
@@ -382,35 +630,29 @@ export default function PersonalPage() {
             </p>
           </div>
 
-          {!mostrarFormulario && (
+          {!mostrarFormulario ? (
             <button
               onClick={abrirNuevo}
               style={estilos.botonPrincipal}
             >
               + Registrar trabajador
             </button>
-          )}
-
-          {mostrarFormulario && (
+          ) : (
             <button
               onClick={cancelarFormulario}
-              style={estilos.botonPrincipal}
+              style={estilos.botonSecundario}
             >
-              Cancelar
+              Cerrar ficha
             </button>
           )}
         </div>
 
         {error && (
-          <div style={estilos.alertaError}>
-            {error}
-          </div>
+          <div style={estilos.alertaError}>{error}</div>
         )}
 
         {mensaje && (
-          <div style={estilos.alertaExito}>
-            {mensaje}
-          </div>
+          <div style={estilos.alertaExito}>{mensaje}</div>
         )}
 
         <section style={estilos.tarjetas}>
@@ -427,9 +669,7 @@ export default function PersonalPage() {
           </div>
 
           <div style={estilos.tarjeta}>
-            <span style={estilos.tarjetaLabel}>
-              Vacaciones
-            </span>
+            <span style={estilos.tarjetaLabel}>Vacaciones</span>
             <strong style={estilos.tarjetaNumero}>
               {totalVacaciones}
             </strong>
@@ -439,9 +679,7 @@ export default function PersonalPage() {
           </div>
 
           <div style={estilos.tarjeta}>
-            <span style={estilos.tarjetaLabel}>
-              Licencias
-            </span>
+            <span style={estilos.tarjetaLabel}>Licencias</span>
             <strong style={estilos.tarjetaNumero}>
               {totalLicencia}
             </strong>
@@ -452,219 +690,387 @@ export default function PersonalPage() {
         </section>
 
         {mostrarFormulario && (
-          <section style={estilos.panel}>
-            <div style={estilos.panelTituloContenedor}>
-              <div>
-                <h2 style={estilos.panelTitulo}>
-                  {editandoId
-                    ? "Editar trabajador"
-                    : "Registrar trabajador"}
-                </h2>
+          <>
+            <section style={estilos.panel}>
+              <div style={estilos.panelTituloContenedor}>
+                <div>
+                  <h2 style={estilos.panelTitulo}>
+                    {editandoId
+                      ? "Ficha del trabajador"
+                      : "Registrar trabajador"}
+                  </h2>
 
-                <p style={estilos.panelSubtitulo}>
-                  {editandoId
-                    ? "Modifica la información de la ficha del trabajador."
-                    : "Completa la información del nuevo trabajador."}
-                </p>
+                  <p style={estilos.panelSubtitulo}>
+                    {editandoId
+                      ? "Puedes modificar esta información cuando lo necesites."
+                      : "Completa la información del nuevo trabajador."}
+                  </p>
+                </div>
               </div>
-            </div>
 
-            <div style={estilos.formGrid}>
-              <Campo label="Nombre *">
-                <input
-                  value={formulario.nombre}
-                  onChange={(e) =>
-                    cambiarCampo("nombre", e.target.value)
-                  }
-                  style={estilos.input}
-                  placeholder="Nombre"
-                />
-              </Campo>
+              <div style={estilos.formGrid}>
+                <Campo label="Nombre *">
+                  <input
+                    value={formulario.nombre}
+                    onChange={(e) =>
+                      cambiarCampo("nombre", e.target.value)
+                    }
+                    style={estilos.input}
+                    placeholder="Nombre"
+                  />
+                </Campo>
 
-              <Campo label="Apellido">
-                <input
-                  value={formulario.apellido}
-                  onChange={(e) =>
-                    cambiarCampo("apellido", e.target.value)
-                  }
-                  style={estilos.input}
-                  placeholder="Apellido"
-                />
-              </Campo>
+                <Campo label="Apellido">
+                  <input
+                    value={formulario.apellido}
+                    onChange={(e) =>
+                      cambiarCampo("apellido", e.target.value)
+                    }
+                    style={estilos.input}
+                    placeholder="Apellido"
+                  />
+                </Campo>
 
-              <Campo label="Documento / CI">
-                <input
-                  value={formulario.documento}
-                  onChange={(e) =>
-                    cambiarCampo("documento", e.target.value)
-                  }
-                  style={estilos.input}
-                  placeholder="Número de documento"
-                />
-              </Campo>
+                <Campo label="Documento / CI">
+                  <input
+                    value={formulario.documento}
+                    onChange={(e) =>
+                      cambiarCampo("documento", e.target.value)
+                    }
+                    style={estilos.input}
+                    placeholder="Número de documento"
+                  />
+                </Campo>
 
-              <Campo label="Teléfono">
-                <input
-                  value={formulario.telefono}
-                  onChange={(e) =>
-                    cambiarCampo("telefono", e.target.value)
-                  }
-                  style={estilos.input}
-                  placeholder="Teléfono"
-                />
-              </Campo>
+                <Campo label="Teléfono">
+                  <input
+                    value={formulario.telefono}
+                    onChange={(e) =>
+                      cambiarCampo("telefono", e.target.value)
+                    }
+                    style={estilos.input}
+                    placeholder="Teléfono"
+                  />
+                </Campo>
 
-              <Campo label="Cargo / función">
-                <input
-                  value={formulario.cargo}
-                  onChange={(e) =>
-                    cambiarCampo("cargo", e.target.value)
-                  }
-                  style={estilos.input}
-                  placeholder="Ej. Encargado, tractorista..."
-                />
-              </Campo>
+                <Campo label="Cargo / función">
+                  <input
+                    value={formulario.cargo}
+                    onChange={(e) =>
+                      cambiarCampo("cargo", e.target.value)
+                    }
+                    style={estilos.input}
+                    placeholder="Ej. Encargado, tractorista..."
+                  />
+                </Campo>
 
-              <Campo label="Estado">
-                <select
-                  value={formulario.estado}
-                  onChange={(e) =>
-                    cambiarCampo("estado", e.target.value)
-                  }
-                  style={estilos.input}
-                >
-                  <option value="activo">Activo</option>
-                  <option value="vacaciones">
-                    Vacaciones
-                  </option>
-                  <option value="licencia">Licencia</option>
-                  <option value="retirado">Retirado</option>
-                </select>
-              </Campo>
+                <Campo label="Estado">
+                  <select
+                    value={formulario.estado}
+                    onChange={(e) =>
+                      cambiarCampo("estado", e.target.value)
+                    }
+                    style={estilos.input}
+                  >
+                    <option value="activo">Activo</option>
+                    <option value="vacaciones">
+                      Vacaciones
+                    </option>
+                    <option value="licencia">Licencia</option>
+                    <option value="retirado">Retirado</option>
+                  </select>
+                </Campo>
 
-              <Campo label="Fecha de ingreso">
-                <input
-                  type="date"
-                  value={formulario.fecha_ingreso}
+                <Campo label="Fecha de ingreso">
+                  <input
+                    type="date"
+                    value={formulario.fecha_ingreso}
+                    onChange={(e) =>
+                      cambiarCampo(
+                        "fecha_ingreso",
+                        e.target.value
+                      )
+                    }
+                    style={estilos.input}
+                  />
+                </Campo>
+
+                <Campo label="Fecha de salida">
+                  <input
+                    type="date"
+                    value={formulario.fecha_salida}
+                    onChange={(e) =>
+                      cambiarCampo(
+                        "fecha_salida",
+                        e.target.value
+                      )
+                    }
+                    style={estilos.input}
+                  />
+                </Campo>
+
+                <Campo label="Tipo de pago">
+                  <select
+                    value={formulario.tipo_pago}
+                    onChange={(e) =>
+                      cambiarCampo("tipo_pago", e.target.value)
+                    }
+                    style={estilos.input}
+                  >
+                    <option value="diario">Diario</option>
+                    <option value="semanal">Semanal</option>
+                    <option value="quincenal">
+                      Quincenal
+                    </option>
+                    <option value="mensual">Mensual</option>
+                    <option value="otro">Otro</option>
+                  </select>
+                </Campo>
+
+                <Campo label="Salario base">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formulario.salario_base}
+                    onChange={(e) =>
+                      cambiarCampo(
+                        "salario_base",
+                        e.target.value
+                      )
+                    }
+                    style={estilos.input}
+                    placeholder="0.00"
+                  />
+                </Campo>
+
+                <Campo label="Moneda">
+                  <select
+                    value={formulario.moneda}
+                    onChange={(e) =>
+                      cambiarCampo("moneda", e.target.value)
+                    }
+                    style={estilos.input}
+                  >
+                    <option value="BOB">
+                      BOB - Bolivianos
+                    </option>
+                    <option value="USD">
+                      USD - Dólares
+                    </option>
+                  </select>
+                </Campo>
+              </div>
+
+              <div style={estilos.campoCompleto}>
+                <label style={estilos.label}>
+                  Observaciones
+                </label>
+
+                <textarea
+                  value={formulario.observaciones}
                   onChange={(e) =>
                     cambiarCampo(
-                      "fecha_ingreso",
+                      "observaciones",
                       e.target.value
                     )
                   }
-                  style={estilos.input}
+                  style={estilos.textarea}
+                  placeholder="Información adicional del trabajador..."
                 />
-              </Campo>
+              </div>
 
-              <Campo label="Fecha de salida">
-                <input
-                  type="date"
-                  value={formulario.fecha_salida}
-                  onChange={(e) =>
-                    cambiarCampo(
-                      "fecha_salida",
-                      e.target.value
-                    )
-                  }
-                  style={estilos.input}
-                />
-              </Campo>
-
-              <Campo label="Tipo de pago">
-                <select
-                  value={formulario.tipo_pago}
-                  onChange={(e) =>
-                    cambiarCampo("tipo_pago", e.target.value)
-                  }
-                  style={estilos.input}
+              <div style={estilos.accionesFormulario}>
+                <button
+                  onClick={cancelarFormulario}
+                  style={estilos.botonSecundario}
+                  disabled={guardando}
                 >
-                  <option value="diario">Diario</option>
-                  <option value="semanal">Semanal</option>
-                  <option value="quincenal">
-                    Quincenal
-                  </option>
-                  <option value="mensual">Mensual</option>
-                  <option value="otro">Otro</option>
-                </select>
-              </Campo>
+                  Cancelar
+                </button>
 
-              <Campo label="Salario base">
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formulario.salario_base}
-                  onChange={(e) =>
-                    cambiarCampo(
-                      "salario_base",
-                      e.target.value
-                    )
-                  }
-                  style={estilos.input}
-                  placeholder="0.00"
-                />
-              </Campo>
-
-              <Campo label="Moneda">
-                <select
-                  value={formulario.moneda}
-                  onChange={(e) =>
-                    cambiarCampo("moneda", e.target.value)
-                  }
-                  style={estilos.input}
+                <button
+                  onClick={guardarTrabajador}
+                  style={estilos.botonPrincipal}
+                  disabled={guardando}
                 >
-                  <option value="BOB">
-                    BOB - Bolivianos
-                  </option>
-                  <option value="USD">
-                    USD - Dólares
-                  </option>
-                </select>
-              </Campo>
+                  {guardando
+                    ? "Guardando..."
+                    : editandoId
+                    ? "Guardar cambios"
+                    : "Guardar trabajador"}
+                </button>
+              </div>
+            </section>
 
-              <div />
-            </div>
+            {editandoId && (
+              <section style={estilos.panel}>
+                <div style={estilos.panelTituloContenedor}>
+                  <div>
+                    <h2 style={estilos.panelTitulo}>
+                      Documentos del trabajador
+                    </h2>
 
-            <div style={estilos.campoCompleto}>
-              <label style={estilos.label}>
-                Observaciones
-              </label>
+                    <p style={estilos.panelSubtitulo}>
+                      Foto, CI, licencia, contrato, certificados
+                      y otros documentos.
+                    </p>
+                  </div>
 
-              <textarea
-                value={formulario.observaciones}
-                onChange={(e) =>
-                  cambiarCampo(
-                    "observaciones",
-                    e.target.value
-                  )
-                }
-                style={estilos.textarea}
-                placeholder="Información adicional del trabajador..."
-              />
-            </div>
+                  <div style={estilos.privado}>
+                    🔒 Archivos privados
+                  </div>
+                </div>
 
-            <div style={estilos.accionesFormulario}>
-              <button
-                onClick={cancelarFormulario}
-                style={estilos.botonSecundario}
-                disabled={guardando}
-              >
-                Cancelar
-              </button>
+                <div style={estilos.documentosFormulario}>
+                  <Campo label="Tipo de documento">
+                    <select
+                      value={tipoArchivo}
+                      onChange={(e) =>
+                        setTipoArchivo(e.target.value)
+                      }
+                      style={estilos.input}
+                    >
+                      {tiposArchivo.map((tipo) => (
+                        <option
+                          key={tipo.valor}
+                          value={tipo.valor}
+                        >
+                          {tipo.texto}
+                        </option>
+                      ))}
+                    </select>
+                  </Campo>
 
-              <button
-                onClick={guardarTrabajador}
-                style={estilos.botonPrincipal}
-                disabled={guardando}
-              >
-                {guardando
-                  ? "Guardando..."
-                  : editandoId
-                  ? "Guardar cambios"
-                  : "Guardar trabajador"}
-              </button>
-            </div>
-          </section>
+                  <Campo label="Seleccionar archivo">
+                    <input
+                      id="archivo-personal"
+                      type="file"
+                      accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf"
+                      onChange={(e) =>
+                        setArchivoSeleccionado(
+                          e.target.files?.[0] || null
+                        )
+                      }
+                      style={estilos.inputArchivo}
+                    />
+                  </Campo>
+
+                  <Campo label="Descripción">
+                    <input
+                      value={descripcionArchivo}
+                      onChange={(e) =>
+                        setDescripcionArchivo(e.target.value)
+                      }
+                      style={estilos.input}
+                      placeholder="Opcional"
+                    />
+                  </Campo>
+
+                  <div style={estilos.subirContenedor}>
+                    <button
+                      onClick={subirDocumento}
+                      style={estilos.botonPrincipal}
+                      disabled={subiendoArchivo}
+                    >
+                      {subiendoArchivo
+                        ? "Subiendo..."
+                        : "+ Agregar documento"}
+                    </button>
+                  </div>
+                </div>
+
+                <div style={estilos.notaArchivo}>
+                  Formatos permitidos: JPG, PNG, WEBP y PDF.
+                  Máximo 10 MB por archivo.
+                </div>
+
+                {archivos.length === 0 ? (
+                  <div style={estilos.vacioDocumentos}>
+                    <div style={estilos.vacioIcono}>📁</div>
+                    <strong>
+                      No hay documentos registrados
+                    </strong>
+                    <span>
+                      Agrega la foto, CI u otro documento del
+                      trabajador.
+                    </span>
+                  </div>
+                ) : (
+                  <div style={estilos.tablaContenedor}>
+                    <table style={estilos.tabla}>
+                      <thead>
+                        <tr>
+                          <th style={estilos.th}>Tipo</th>
+                          <th style={estilos.th}>Archivo</th>
+                          <th style={estilos.th}>Descripción</th>
+                          <th style={estilos.th}>Tamaño</th>
+                          <th style={estilos.th}>Fecha</th>
+                          <th style={estilos.th}></th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        {archivos.map((archivo) => (
+                          <tr key={archivo.id}>
+                            <td style={estilos.td}>
+                              <strong>
+                                {etiquetaTipoArchivo(
+                                  archivo.tipo
+                                )}
+                              </strong>
+                            </td>
+
+                            <td style={estilos.td}>
+                              {archivo.nombre_archivo}
+                            </td>
+
+                            <td style={estilos.td}>
+                              {archivo.descripcion || "—"}
+                            </td>
+
+                            <td style={estilos.td}>
+                              {mostrarTamano(
+                                archivo.tamano_bytes
+                              )}
+                            </td>
+
+                            <td style={estilos.td}>
+                              {new Date(
+                                archivo.created_at
+                              ).toLocaleDateString("es-BO")}
+                            </td>
+
+                            <td style={estilos.td}>
+                              <div style={estilos.accionesArchivo}>
+                                <button
+                                  onClick={() =>
+                                    abrirDocumento(archivo)
+                                  }
+                                  style={estilos.botonVer}
+                                >
+                                  Ver
+                                </button>
+
+                                <button
+                                  onClick={() =>
+                                    eliminarDocumento(archivo)
+                                  }
+                                  style={estilos.botonEliminar}
+                                >
+                                  Eliminar
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </section>
+            )}
+          </>
         )}
 
         <section style={estilos.panel}>
@@ -686,9 +1092,7 @@ export default function PersonalPage() {
           {trabajadores.length === 0 ? (
             <div style={estilos.vacio}>
               <div style={estilos.vacioIcono}>👥</div>
-
               <strong>No hay personal registrado</strong>
-
               <span>
                 Registra el primer trabajador de la finca.
               </span>
@@ -749,8 +1153,7 @@ export default function PersonalPage() {
                         <span
                           style={{
                             ...estilos.estado,
-                            ...(trabajador.estado ===
-                            "activo"
+                            ...(trabajador.estado === "activo"
                               ? estilos.estadoActivo
                               : trabajador.estado ===
                                 "retirado"
@@ -784,7 +1187,7 @@ export default function PersonalPage() {
                           }
                           style={estilos.botonEditar}
                         >
-                          Editar
+                          Editar / Ficha
                         </button>
                       </td>
                     </tr>
@@ -915,6 +1318,7 @@ const estilos: Record<string, React.CSSProperties> = {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
+    gap: "15px",
   },
 
   panelTitulo: {
@@ -968,6 +1372,17 @@ const estilos: Record<string, React.CSSProperties> = {
     outline: "none",
   },
 
+  inputArchivo: {
+    width: "100%",
+    minHeight: "42px",
+    border: "1px solid #d3ddd6",
+    borderRadius: "8px",
+    padding: "8px",
+    boxSizing: "border-box",
+    background: "white",
+    fontSize: "12px",
+  },
+
   textarea: {
     width: "100%",
     minHeight: "85px",
@@ -1008,6 +1423,35 @@ const estilos: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     fontSize: "13px",
     cursor: "pointer",
+  },
+
+  documentosFormulario: {
+    padding: "22px 22px 10px",
+    display: "grid",
+    gridTemplateColumns:
+      "minmax(180px, 0.8fr) minmax(260px, 1.3fr) minmax(220px, 1fr) auto",
+    gap: "15px",
+    alignItems: "end",
+  },
+
+  subirContenedor: {
+    display: "flex",
+    alignItems: "flex-end",
+  },
+
+  notaArchivo: {
+    padding: "0 22px 18px",
+    fontSize: "11px",
+    color: "#8a9890",
+  },
+
+  privado: {
+    background: "#edf6f0",
+    color: "#176b3a",
+    padding: "7px 10px",
+    borderRadius: "8px",
+    fontSize: "11px",
+    fontWeight: 700,
   },
 
   tablaContenedor: {
@@ -1090,6 +1534,33 @@ const estilos: Record<string, React.CSSProperties> = {
     cursor: "pointer",
   },
 
+  accionesArchivo: {
+    display: "flex",
+    gap: "7px",
+  },
+
+  botonVer: {
+    border: "1px solid #bfd6c7",
+    background: "#edf7f0",
+    color: "#176b3a",
+    borderRadius: "7px",
+    padding: "6px 10px",
+    fontWeight: 700,
+    fontSize: "11px",
+    cursor: "pointer",
+  },
+
+  botonEliminar: {
+    border: "1px solid #f0caca",
+    background: "#fff5f5",
+    color: "#b42318",
+    borderRadius: "7px",
+    padding: "6px 10px",
+    fontWeight: 700,
+    fontSize: "11px",
+    cursor: "pointer",
+  },
+
   vacio: {
     minHeight: "240px",
     display: "flex",
@@ -1101,7 +1572,19 @@ const estilos: Record<string, React.CSSProperties> = {
     fontSize: "13px",
   },
 
+  vacioDocumentos: {
+    minHeight: "150px",
+    borderTop: "1px solid #edf1ee",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: "7px",
+    color: "#819087",
+    fontSize: "12px",
+  },
+
   vacioIcono: {
-    fontSize: "32px",
+    fontSize: "30px",
   },
 };
