@@ -16,7 +16,7 @@ export default function Sidebar() {
     {
       texto: "Ganado",
       icono: "🐄",
-      ruta: null,
+      ruta: "/ganado",
     },
     {
       texto: "Lotes",
