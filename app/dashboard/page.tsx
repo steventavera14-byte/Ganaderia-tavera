@@ -320,6 +320,9 @@ export default function DashboardPage() {
         <MenuItem
           texto="Pesajes"
           icono="⚖"
+          onClick={() =>
+            irA("/pesajes")
+          }
         />
 
         <MenuItem
