@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
+import { supabase } from "../../lib/supabase";
 
 export default function Sidebar() {
   const router = useRouter();
@@ -74,53 +75,68 @@ export default function Sidebar() {
     },
   ];
 
+  const cerrarSesion = async () => {
+    await supabase.auth.signOut();
+    router.replace("/");
+  };
+
   return (
     <aside style={estilos.sidebar}>
-      <div style={estilos.logo}>
-        <div style={estilos.logoIcono}>🐂</div>
+      <div>
+        <div style={estilos.logo}>
+          <div style={estilos.logoIcono}>🐂</div>
 
-        <div>
-          <strong>Ganadería</strong>
-          <br />
-          <strong>Tavera</strong>
+          <div>
+            <strong>Ganadería</strong>
+            <br />
+            <strong>Tavera</strong>
+          </div>
         </div>
+
+        <nav>
+          {menuItems.map((item) => {
+            const activo =
+              item.ruta !== null &&
+              pathname === item.ruta;
+
+            return (
+              <div
+                key={item.texto}
+                onClick={() => {
+                  if (item.ruta) {
+                    router.push(item.ruta);
+                  }
+                }}
+                style={{
+                  ...estilos.menuItem,
+                  background: activo
+                    ? "rgba(255,255,255,0.14)"
+                    : "transparent",
+                  cursor: item.ruta
+                    ? "pointer"
+                    : "default",
+                  fontWeight: activo ? 700 : 500,
+                  opacity: item.ruta ? 1 : 0.75,
+                }}
+              >
+                <span style={estilos.icono}>
+                  {item.icono}
+                </span>
+
+                <span>{item.texto}</span>
+              </div>
+            );
+          })}
+        </nav>
       </div>
 
-      <nav>
-        {menuItems.map((item) => {
-          const activo =
-            item.ruta !== null &&
-            pathname === item.ruta;
-
-          return (
-            <div
-              key={item.texto}
-              onClick={() => {
-                if (item.ruta) {
-                  router.push(item.ruta);
-                }
-              }}
-              style={{
-                ...estilos.menuItem,
-                background: activo
-                  ? "rgba(255,255,255,0.14)"
-                  : "transparent",
-                cursor: item.ruta
-                  ? "pointer"
-                  : "default",
-                fontWeight: activo ? 700 : 500,
-                opacity: item.ruta ? 1 : 0.75,
-              }}
-            >
-              <span style={estilos.icono}>
-                {item.icono}
-              </span>
-
-              <span>{item.texto}</span>
-            </div>
-          );
-        })}
-      </nav>
+      <button
+        onClick={cerrarSesion}
+        style={estilos.cerrarSesion}
+      >
+        <span style={estilos.icono}>↪</span>
+        <span>Cerrar sesión</span>
+      </button>
     </aside>
   );
 }
@@ -138,6 +154,10 @@ const estilos: Record<string, React.CSSProperties> = {
     boxSizing: "border-box",
     overflowY: "auto",
     zIndex: 100,
+
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "space-between",
   },
 
   logo: {
@@ -175,5 +195,22 @@ const estilos: Record<string, React.CSSProperties> = {
     width: "22px",
     textAlign: "center",
     flexShrink: 0,
+  },
+
+  cerrarSesion: {
+    width: "100%",
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    padding: "11px 12px",
+    marginTop: "20px",
+    border: "1px solid rgba(255,255,255,0.18)",
+    borderRadius: "9px",
+    background: "rgba(255,255,255,0.06)",
+    color: "white",
+    fontSize: "14px",
+    fontWeight: 600,
+    cursor: "pointer",
+    textAlign: "left",
   },
 };
