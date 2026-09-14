@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
+import Sidebar from "../components/Sidebar";
 
 type Lote = {
   id: string;
@@ -249,15 +250,6 @@ export default function DashboardPage() {
       .map((lote) => lote.potrero_id)
   ).size;
 
-  const irA = (ruta: string) => {
-    window.location.href = ruta;
-  };
-
-  const cerrarSesion = async () => {
-    await supabase.auth.signOut();
-    window.location.href = "/";
-  };
-
   if (loading) {
     return (
       <main style={estilos.cargando}>
@@ -268,112 +260,7 @@ export default function DashboardPage() {
 
   return (
     <main style={estilos.pagina}>
-      <aside style={estilos.sidebar}>
-        <div style={estilos.logo}>
-          <div style={estilos.logoIcono}>
-            🐂
-          </div>
-
-          <div>
-            <strong>Ganadería</strong>
-            <br />
-            <strong>Tavera</strong>
-          </div>
-        </div>
-
-        <MenuItem
-          texto="Dashboard"
-          icono="▦"
-          activo
-          onClick={() =>
-            irA("/dashboard")
-          }
-        />
-
-        <MenuItem
-          texto="Ganado"
-          icono="🐄"
-        />
-
-        <MenuItem
-          texto="Lotes"
-          icono="▣"
-          onClick={() =>
-            irA("/lotes")
-          }
-        />
-
-        <MenuItem
-          texto="Potreros"
-          icono="🌱"
-          onClick={() =>
-            irA("/potreros")
-          }
-        />
-
-        <MenuItem
-          texto="Nacimientos"
-          icono="🐮"
-          onClick={() =>
-            irA("/nacimientos")
-          }
-        />
-
-        <MenuItem
-          texto="Pesajes"
-          icono="⚖"
-          onClick={() =>
-            irA("/pesajes")
-          }
-        />
-
-        <MenuItem
-          texto="Movimientos"
-          icono="↔"
-          onClick={() =>
-            irA("/movimientos")
-          }
-        />
-
-        <MenuItem
-          texto="Sanidad"
-          icono="♥"
-        />
-
-        <MenuItem
-          texto="Feedlot"
-          icono="🌾"
-        />
-
-        <MenuItem
-          texto="Maquinaria"
-          icono="🚜"
-        />
-
-        <MenuItem
-          texto="Personal"
-          icono="👥"
-        />
-
-        <MenuItem
-          texto="Gastos"
-          icono="$"
-        />
-
-        <MenuItem
-          texto="Reportes"
-          icono="▤"
-        />
-
-        <div style={estilos.separador} />
-
-        <button
-          onClick={cerrarSesion}
-          style={estilos.cerrarSesion}
-        >
-          Cerrar sesión
-        </button>
-      </aside>
+      <Sidebar />
 
       <section style={estilos.contenido}>
         <header style={estilos.header}>
@@ -548,51 +435,6 @@ export default function DashboardPage() {
   );
 }
 
-function MenuItem({
-  texto,
-  icono,
-  activo = false,
-  onClick,
-}: {
-  texto: string;
-  icono: string;
-  activo?: boolean;
-  onClick?: () => void;
-}) {
-  return (
-    <div
-      onClick={onClick}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "12px",
-        padding: "11px 12px",
-        marginBottom: "5px",
-        borderRadius: "9px",
-        background: activo
-          ? "rgba(255,255,255,0.14)"
-          : "transparent",
-        cursor: onClick
-          ? "pointer"
-          : "default",
-        fontSize: "14px",
-        fontWeight: activo ? 700 : 500,
-      }}
-    >
-      <span
-        style={{
-          width: "22px",
-          textAlign: "center",
-        }}
-      >
-        {icono}
-      </span>
-
-      {texto}
-    </div>
-  );
-}
-
 function Tarjeta({
   titulo,
   valor,
@@ -699,57 +541,6 @@ const estilos: Record<
     fontFamily: "Arial, sans-serif",
     color: "#176b3a",
     fontWeight: 700,
-  },
-
-  sidebar: {
-    position: "fixed",
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: "235px",
-    background: "#103f28",
-    color: "white",
-    padding: "26px 18px",
-    boxSizing: "border-box",
-    overflowY: "auto",
-  },
-
-  logo: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    marginBottom: "32px",
-    paddingLeft: "8px",
-  },
-
-  logoIcono: {
-    width: "44px",
-    height: "44px",
-    borderRadius: "12px",
-    background: "#1b7542",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: "24px",
-  },
-
-  separador: {
-    height: "1px",
-    background:
-      "rgba(255,255,255,0.18)",
-    margin: "28px 0 18px",
-  },
-
-  cerrarSesion: {
-    width: "100%",
-    padding: "10px",
-    borderRadius: "9px",
-    border:
-      "1px solid rgba(255,255,255,0.35)",
-    background: "transparent",
-    color: "white",
-    cursor: "pointer",
-    fontWeight: 600,
   },
 
   contenido: {
