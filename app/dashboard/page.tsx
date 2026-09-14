@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import Sidebar from "../components/Sidebar";
 
@@ -28,7 +29,10 @@ type Nacimiento = {
 };
 
 export default function DashboardPage() {
+  const router = useRouter();
+
   const [loading, setLoading] = useState(true);
+  const [esMovil, setEsMovil] = useState(false);
 
   const [nombreUsuario, setNombreUsuario] =
     useState("Steven");
@@ -39,7 +43,25 @@ export default function DashboardPage() {
     useState<Nacimiento[]>([]);
 
   useEffect(() => {
+    const comprobarPantalla = () => {
+      setEsMovil(window.innerWidth <= 820);
+    };
+
+    comprobarPantalla();
+
+    window.addEventListener(
+      "resize",
+      comprobarPantalla
+    );
+
     iniciarDashboard();
+
+    return () => {
+      window.removeEventListener(
+        "resize",
+        comprobarPantalla
+      );
+    };
   }, []);
 
   const iniciarDashboard = async () => {
@@ -92,15 +114,15 @@ export default function DashboardPage() {
         .from("gan_lotes_ganado")
         .select(
           `
-          id,
-          nombre,
-          cantidad_total,
-          cantidad_machos,
-          cantidad_hembras,
-          peso_promedio,
-          potrero_id,
-          estado
-        `
+            id,
+            nombre,
+            cantidad_total,
+            cantidad_machos,
+            cantidad_hembras,
+            peso_promedio,
+            potrero_id,
+            estado
+          `
         )
         .eq("finca_id", fincaId)
         .in("estado", ["activo", "feedlot"])
@@ -110,11 +132,11 @@ export default function DashboardPage() {
         .from("gan_potreros")
         .select(
           `
-          id,
-          nombre,
-          hectareas,
-          estado
-        `
+            id,
+            nombre,
+            hectareas,
+            estado
+          `
         )
         .eq("finca_id", fincaId)
         .order("nombre"),
@@ -123,12 +145,12 @@ export default function DashboardPage() {
         .from("gan_lote_eventos")
         .select(
           `
-          cantidad,
-          sexo,
-          gan_lotes_ganado!inner (
-            finca_id
-          )
-        `
+            cantidad,
+            sexo,
+            gan_lotes_ganado!inner (
+              finca_id
+            )
+          `
         )
         .eq("tipo", "nacimiento")
         .eq(
@@ -173,6 +195,18 @@ export default function DashboardPage() {
     0
   );
 
+  const machosTotales = lotes.reduce(
+    (suma, lote) =>
+      suma + Number(lote.cantidad_machos || 0),
+    0
+  );
+
+  const hembrasTotales = lotes.reduce(
+    (suma, lote) =>
+      suma + Number(lote.cantidad_hembras || 0),
+    0
+  );
+
   const lotesActivos = lotes.length;
 
   const machosNacidos = nacimientos
@@ -182,8 +216,7 @@ export default function DashboardPage() {
     )
     .reduce(
       (suma, nacimiento) =>
-        suma +
-        Number(nacimiento.cantidad || 0),
+        suma + Number(nacimiento.cantidad || 0),
       0
     );
 
@@ -194,8 +227,7 @@ export default function DashboardPage() {
     )
     .reduce(
       (suma, nacimiento) =>
-        suma +
-        Number(nacimiento.cantidad || 0),
+        suma + Number(nacimiento.cantidad || 0),
       0
     );
 
@@ -221,24 +253,20 @@ export default function DashboardPage() {
   const cantidadConPeso =
     animalesConPeso.reduce(
       (suma, lote) =>
-        suma +
-        Number(lote.cantidad_total || 0),
+        suma + Number(lote.cantidad_total || 0),
       0
     );
 
   const pesoPromedio =
     cantidadConPeso > 0
-      ? pesoTotalPonderado /
-        cantidadConPeso
+      ? pesoTotalPonderado / cantidadConPeso
       : 0;
 
-  const superficieTotal =
-    potreros.reduce(
-      (suma, potrero) =>
-        suma +
-        Number(potrero.hectareas || 0),
-      0
-    );
+  const superficieTotal = potreros.reduce(
+    (suma, potrero) =>
+      suma + Number(potrero.hectareas || 0),
+    0
+  );
 
   const potrerosConGanado = new Set(
     lotes
@@ -250,10 +278,18 @@ export default function DashboardPage() {
       .map((lote) => lote.potrero_id)
   ).size;
 
+  const irA = (ruta: string) => {
+    router.push(ruta);
+  };
+
   if (loading) {
     return (
       <main style={estilos.cargando}>
-        Cargando Ganadería Tavera...
+        <div style={estilos.cargandoLogo}>🐂</div>
+        <strong>Ganadería Tavera</strong>
+        <span style={estilos.cargandoTexto}>
+          Cargando información...
+        </span>
       </main>
     );
   }
@@ -262,133 +298,404 @@ export default function DashboardPage() {
     <main style={estilos.pagina}>
       <Sidebar />
 
-      <section style={estilos.contenido}>
-        <header style={estilos.header}>
-          <div>
-            <h1 style={estilos.titulo}>
-              Hola, {nombreUsuario}
-            </h1>
+      <section
+        style={{
+          ...estilos.contenido,
+          ...(esMovil
+            ? estilos.contenidoMovil
+            : {}),
+        }}
+      >
+        {/* HERO */}
 
-            <p style={estilos.subtitulo}>
-              Resumen general de Ganadería Tavera
-            </p>
+        <section
+          style={{
+            ...estilos.hero,
+            ...(esMovil ? estilos.heroMovil : {}),
+          }}
+        >
+          <div style={estilos.heroDecoracionUno} />
+          <div style={estilos.heroDecoracionDos} />
+
+          <div style={estilos.heroContenido}>
+            <div>
+              <div style={estilos.heroEtiqueta}>
+                GANADERÍA TAVERA
+              </div>
+
+              <h1
+                style={{
+                  ...estilos.heroTitulo,
+                  ...(esMovil
+                    ? estilos.heroTituloMovil
+                    : {}),
+                }}
+              >
+                Hola, {nombreUsuario}
+              </h1>
+
+              <p style={estilos.heroSubtitulo}>
+                Este es el estado actual de tu
+                operación ganadera.
+              </p>
+            </div>
+
+            <div style={estilos.estadoOperacion}>
+              <span style={estilos.puntoActivo} />
+              Operación activa
+            </div>
           </div>
 
-          <div style={estilos.operacion}>
-            🟢 Operación activa
-          </div>
-        </header>
+          <div style={estilos.heroResumen}>
+            <div>
+              <span style={estilos.heroResumenLabel}>
+                Ganado
+              </span>
+              <strong style={estilos.heroResumenValor}>
+                {ganadoTotal}
+              </strong>
+            </div>
 
-        <div style={estilos.tarjetas}>
-          <Tarjeta
+            <div style={estilos.heroSeparador} />
+
+            <div>
+              <span style={estilos.heroResumenLabel}>
+                Lotes
+              </span>
+              <strong style={estilos.heroResumenValor}>
+                {lotesActivos}
+              </strong>
+            </div>
+
+            <div style={estilos.heroSeparador} />
+
+            <div>
+              <span style={estilos.heroResumenLabel}>
+                Superficie
+              </span>
+              <strong style={estilos.heroResumenValor}>
+                {superficieTotal} ha
+              </strong>
+            </div>
+          </div>
+        </section>
+
+        {/* TARJETAS PRINCIPALES */}
+
+        <section
+          style={{
+            ...estilos.tarjetasPrincipales,
+            gridTemplateColumns: esMovil
+              ? "repeat(2, minmax(0, 1fr))"
+              : "repeat(4, minmax(0, 1fr))",
+          }}
+        >
+          <TarjetaPrincipal
+            icono="🐄"
             titulo="Ganado total"
             valor={String(ganadoTotal)}
-            detalle="Animales en lotes activos"
-            icono="🐄"
+            detalle="Animales activos"
+            onClick={() => irA("/ganado")}
+            compacta={esMovil}
           />
 
-          <Tarjeta
-            titulo="Lotes activos"
-            valor={String(lotesActivos)}
-            detalle="Grupos de ganado"
-            icono="▣"
-          />
-
-          <Tarjeta
-            titulo="Nacimientos"
-            valor={String(
-              totalNacimientos
-            )}
-            detalle="Registrados"
-            icono="🐮"
-          />
-
-          <Tarjeta
+          <TarjetaPrincipal
+            icono="⚖️"
             titulo="Peso promedio"
             valor={
               pesoPromedio > 0
-                ? `${Math.round(
-                    pesoPromedio
-                  )} kg`
+                ? `${Math.round(pesoPromedio)} kg`
                 : "—"
             }
             detalle="Promedio ponderado"
-            icono="⚖"
+            onClick={() => irA("/pesajes")}
+            compacta={esMovil}
           />
 
-          <Tarjeta
-            titulo="Potreros"
-            valor={String(
-              potreros.length
-            )}
-            detalle={`${superficieTotal} ha registradas`}
+          <TarjetaPrincipal
+            icono="🐮"
+            titulo="Nacimientos"
+            valor={String(totalNacimientos)}
+            detalle="Registrados"
+            onClick={() => irA("/nacimientos")}
+            compacta={esMovil}
+          />
+
+          <TarjetaPrincipal
             icono="🌱"
+            titulo="Potreros"
+            valor={String(potreros.length)}
+            detalle={`${superficieTotal} ha`}
+            onClick={() => irA("/potreros")}
+            compacta={esMovil}
           />
+        </section>
 
-          <Tarjeta
-            titulo="Gastos"
-            valor="$0"
-            detalle="Pendiente de conectar"
-            icono="$"
-          />
-        </div>
+        {/* ACCESOS RÁPIDOS */}
 
-        <div style={estilos.gridSuperior}>
-          <Panel titulo="Distribución del ganado">
+        <section style={estilos.seccion}>
+          <div style={estilos.tituloSeccionFila}>
+            <div>
+              <h2 style={estilos.tituloSeccion}>
+                Accesos rápidos
+              </h2>
+
+              <p style={estilos.subtituloSeccion}>
+                Operaciones frecuentes
+              </p>
+            </div>
+          </div>
+
+          <div
+            style={{
+              ...estilos.accesosGrid,
+              gridTemplateColumns: esMovil
+                ? "repeat(3, minmax(0, 1fr))"
+                : "repeat(6, minmax(0, 1fr))",
+            }}
+          >
+            <AccesoRapido
+              icono="🐄"
+              texto="Ganado"
+              onClick={() => irA("/ganado")}
+            />
+
+            <AccesoRapido
+              icono="▣"
+              texto="Lotes"
+              onClick={() => irA("/lotes")}
+            />
+
+            <AccesoRapido
+              icono="🌱"
+              texto="Potreros"
+              onClick={() => irA("/potreros")}
+            />
+
+            <AccesoRapido
+              icono="⚖️"
+              texto="Pesajes"
+              onClick={() => irA("/pesajes")}
+            />
+
+            <AccesoRapido
+              icono="♥"
+              texto="Sanidad"
+              onClick={() => irA("/sanidad")}
+            />
+
+            <AccesoRapido
+              icono="👥"
+              texto="Personal"
+              onClick={() => irA("/personal")}
+            />
+          </div>
+        </section>
+
+        {/* INVENTARIO */}
+
+        <section
+          style={{
+            ...estilos.gridMedio,
+            gridTemplateColumns: esMovil
+              ? "1fr"
+              : "1.6fr 1fr",
+          }}
+        >
+          <div style={estilos.panel}>
+            <div style={estilos.panelHeader}>
+              <div>
+                <h2 style={estilos.panelTitulo}>
+                  Distribución del ganado
+                </h2>
+
+                <p style={estilos.panelSubtitulo}>
+                  Inventario por lote
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => irA("/lotes")}
+                style={estilos.botonVerTodo}
+              >
+                Ver lotes
+              </button>
+            </div>
+
             {lotes.length === 0 ? (
               <div style={estilos.vacio}>
-                Los datos de lotes y potreros
-                aparecerán aquí.
+                No hay lotes activos registrados.
               </div>
             ) : (
-              <div>
-                {lotes.map((lote) => (
-                  <div
-                    key={lote.id}
-                    style={
-                      estilos.filaResumen
-                    }
-                  >
-                    <div>
-                      <strong>
-                        {lote.nombre}
-                      </strong>
+              <div style={estilos.listaLotes}>
+                {lotes.map((lote) => {
+                  const porcentaje =
+                    ganadoTotal > 0
+                      ? (Number(
+                          lote.cantidad_total || 0
+                        ) /
+                          ganadoTotal) *
+                        100
+                      : 0;
+
+                  return (
+                    <div
+                      key={lote.id}
+                      style={estilos.loteItem}
+                    >
+                      <div style={estilos.loteFila}>
+                        <div>
+                          <strong
+                            style={estilos.loteNombre}
+                          >
+                            {lote.nombre}
+                          </strong>
+
+                          <div
+                            style={
+                              estilos.loteDetalle
+                            }
+                          >
+                            {Number(
+                              lote.cantidad_machos ||
+                                0
+                            )}{" "}
+                            machos ·{" "}
+                            {Number(
+                              lote.cantidad_hembras ||
+                                0
+                            )}{" "}
+                            hembras
+                          </div>
+                        </div>
+
+                        <div
+                          style={
+                            estilos.loteCantidad
+                          }
+                        >
+                          {Number(
+                            lote.cantidad_total || 0
+                          )}
+                        </div>
+                      </div>
 
                       <div
                         style={
-                          estilos.detalleFila
+                          estilos.barraContenedor
                         }
                       >
-                        {Number(
-                          lote.cantidad_machos ||
-                            0
-                        )}{" "}
-                        machos ·{" "}
-                        {Number(
-                          lote.cantidad_hembras ||
-                            0
-                        )}{" "}
-                        hembras
+                        <div
+                          style={{
+                            ...estilos.barra,
+                            width: `${Math.max(
+                              porcentaje,
+                              2
+                            )}%`,
+                          }}
+                        />
                       </div>
                     </div>
-
-                    <strong
-                      style={
-                        estilos.numeroVerde
-                      }
-                    >
-                      {Number(
-                        lote.cantidad_total ||
-                          0
-                      )}
-                    </strong>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
-          </Panel>
+          </div>
 
-          <Panel titulo="Resumen de nacimientos">
+          <div style={estilos.panel}>
+            <div style={estilos.panelHeader}>
+              <div>
+                <h2 style={estilos.panelTitulo}>
+                  Composición
+                </h2>
+
+                <p style={estilos.panelSubtitulo}>
+                  Inventario actual
+                </p>
+              </div>
+            </div>
+
+            <div style={estilos.composicion}>
+              <div style={estilos.composicionItem}>
+                <div
+                  style={
+                    estilos.composicionIcono
+                  }
+                >
+                  ♂
+                </div>
+
+                <div>
+                  <span
+                    style={
+                      estilos.composicionLabel
+                    }
+                  >
+                    Machos
+                  </span>
+
+                  <strong
+                    style={
+                      estilos.composicionValor
+                    }
+                  >
+                    {machosTotales}
+                  </strong>
+                </div>
+              </div>
+
+              <div style={estilos.composicionItem}>
+                <div
+                  style={
+                    estilos.composicionIcono
+                  }
+                >
+                  ♀
+                </div>
+
+                <div>
+                  <span
+                    style={
+                      estilos.composicionLabel
+                    }
+                  >
+                    Hembras
+                  </span>
+
+                  <strong
+                    style={
+                      estilos.composicionValor
+                    }
+                  >
+                    {hembrasTotales}
+                  </strong>
+                </div>
+              </div>
+            </div>
+
+            <div style={estilos.totalInventario}>
+              <span>Total inventario</span>
+
+              <strong>{ganadoTotal}</strong>
+            </div>
+          </div>
+        </section>
+
+        {/* RESUMEN INFERIOR */}
+
+        <section
+          style={{
+            ...estilos.gridInferior,
+            gridTemplateColumns: esMovil
+              ? "1fr"
+              : "repeat(3, minmax(0, 1fr))",
+          }}
+        >
+          <ResumenPanel
+            icono="🐮"
+            titulo="Nacimientos"
+          >
             <FilaDato
               texto="Machos"
               valor={machosNacidos}
@@ -402,99 +709,150 @@ export default function DashboardPage() {
             <FilaDato
               texto="Total"
               valor={totalNacimientos}
+              destacado
             />
-          </Panel>
-        </div>
+          </ResumenPanel>
 
-        <div style={estilos.gridInferior}>
-          <Panel titulo="Potreros">
+          <ResumenPanel
+            icono="🌱"
+            titulo="Potreros"
+          >
             <FilaDato
-              texto="Potreros registrados"
+              texto="Registrados"
               valor={potreros.length}
             />
 
             <FilaDato
-              texto="Potreros con ganado"
+              texto="Con ganado"
               valor={potrerosConGanado}
             />
 
             <FilaDato
-              texto="Superficie registrada"
+              texto="Superficie"
               valor={`${superficieTotal} ha`}
+              destacado
             />
-          </Panel>
+          </ResumenPanel>
 
-          <Panel titulo="Alertas y pendientes">
-            <div style={estilos.vacio}>
-              No hay alertas pendientes.
+          <ResumenPanel
+            icono="🔔"
+            titulo="Alertas"
+          >
+            <div style={estilos.sinAlertas}>
+              <div style={estilos.checkAlertas}>
+                ✓
+              </div>
+
+              <strong>Todo al día</strong>
+
+              <span>
+                No hay alertas pendientes.
+              </span>
             </div>
-          </Panel>
+          </ResumenPanel>
+        </section>
+
+        <div style={estilos.pieDashboard}>
+          Ganadería Tavera · Gestión ganadera
         </div>
       </section>
     </main>
   );
 }
 
-function Tarjeta({
+function TarjetaPrincipal({
+  icono,
   titulo,
   valor,
   detalle,
-  icono,
+  onClick,
+  compacta,
 }: {
+  icono: string;
   titulo: string;
   valor: string;
   detalle: string;
-  icono: string;
+  onClick: () => void;
+  compacta: boolean;
 }) {
   return (
-    <div style={estilos.tarjeta}>
-      <div
-        style={
-          estilos.tarjetaEncabezado
-        }
-      >
-        <span
-          style={
-            estilos.tarjetaTitulo
-          }
-        >
-          {titulo}
-        </span>
-
-        <div
-          style={estilos.iconoTarjeta}
-        >
-          {icono}
-        </div>
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        ...estilos.tarjetaPrincipal,
+        padding: compacta ? "15px" : "19px",
+        minHeight: compacta ? "132px" : "145px",
+      }}
+    >
+      <div style={estilos.tarjetaIcono}>
+        {icono}
       </div>
 
+      <span style={estilos.tarjetaTitulo}>
+        {titulo}
+      </span>
+
       <strong
-        style={estilos.tarjetaValor}
+        style={{
+          ...estilos.tarjetaValor,
+          fontSize: compacta ? "25px" : "30px",
+        }}
       >
         {valor}
       </strong>
 
-      <span
-        style={estilos.tarjetaDetalle}
-      >
+      <span style={estilos.tarjetaDetalle}>
         {detalle}
       </span>
-    </div>
+    </button>
   );
 }
 
-function Panel({
+function AccesoRapido({
+  icono,
+  texto,
+  onClick,
+}: {
+  icono: string;
+  texto: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={estilos.accesoRapido}
+    >
+      <div style={estilos.accesoIcono}>
+        {icono}
+      </div>
+
+      <span>{texto}</span>
+    </button>
+  );
+}
+
+function ResumenPanel({
+  icono,
   titulo,
   children,
 }: {
+  icono: string;
   titulo: string;
   children: React.ReactNode;
 }) {
   return (
     <div style={estilos.panel}>
-      <h2 style={estilos.panelTitulo}>
-        {titulo}
-      </h2>
+      <div style={estilos.resumenTitulo}>
+        <div style={estilos.resumenIcono}>
+          {icono}
+        </div>
+
+        <h2 style={estilos.panelTitulo}>
+          {titulo}
+        </h2>
+      </div>
 
       {children}
     </div>
@@ -504,16 +862,29 @@ function Panel({
 function FilaDato({
   texto,
   valor,
+  destacado = false,
 }: {
   texto: string;
   valor: string | number;
+  destacado?: boolean;
 }) {
   return (
-    <div style={estilos.filaDato}>
+    <div
+      style={{
+        ...estilos.filaDato,
+        ...(destacado
+          ? estilos.filaDestacada
+          : {}),
+      }}
+    >
       <span>{texto}</span>
 
       <strong
-        style={estilos.numeroVerde}
+        style={{
+          color: destacado
+            ? "#176b3a"
+            : "#2d4938",
+        }}
       >
         {valor}
       </strong>
@@ -527,171 +898,514 @@ const estilos: Record<
 > = {
   pagina: {
     minHeight: "100vh",
-    background: "#f4f7f3",
-    fontFamily: "Arial, sans-serif",
+    background: "#f3f6f3",
     color: "#20352a",
+    fontFamily:
+      '-apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif',
   },
 
   cargando: {
     minHeight: "100vh",
+    background: "#f3f6f3",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "8px",
+    color: "#174c2e",
+  },
+
+  cargandoLogo: {
+    width: "58px",
+    height: "58px",
+    borderRadius: "17px",
+    background: "#176b3a",
+    color: "white",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    background: "#f4f7f3",
-    fontFamily: "Arial, sans-serif",
-    color: "#176b3a",
-    fontWeight: 700,
+    fontSize: "30px",
+    marginBottom: "5px",
+  },
+
+  cargandoTexto: {
+    fontSize: "12px",
+    color: "#829087",
   },
 
   contenido: {
     marginLeft: "235px",
-    padding: "32px",
+    padding: "28px",
+    boxSizing: "border-box",
+    maxWidth: "1700px",
   },
 
-  header: {
+  contenidoMovil: {
+    marginLeft: 0,
+    padding: "84px 14px 24px",
+    width: "100%",
+  },
+
+  hero: {
+    position: "relative",
+    overflow: "hidden",
+    borderRadius: "22px",
+    padding: "30px 32px 24px",
+    marginBottom: "20px",
+    background:
+      "linear-gradient(135deg, #0d4a2d 0%, #176b3a 58%, #27884e 100%)",
+    color: "white",
+    boxShadow:
+      "0 12px 35px rgba(20,79,45,0.16)",
+  },
+
+  heroMovil: {
+    borderRadius: "18px",
+    padding: "23px 20px 19px",
+  },
+
+  heroDecoracionUno: {
+    position: "absolute",
+    width: "260px",
+    height: "260px",
+    borderRadius: "50%",
+    background: "rgba(255,255,255,0.055)",
+    right: "-70px",
+    top: "-120px",
+  },
+
+  heroDecoracionDos: {
+    position: "absolute",
+    width: "180px",
+    height: "180px",
+    borderRadius: "50%",
+    background: "rgba(255,255,255,0.04)",
+    right: "120px",
+    bottom: "-135px",
+  },
+
+  heroContenido: {
+    position: "relative",
+    zIndex: 2,
     display: "flex",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
-    marginBottom: "28px",
+    gap: "15px",
   },
 
-  titulo: {
+  heroEtiqueta: {
+    fontSize: "10px",
+    fontWeight: 800,
+    letterSpacing: "1.5px",
+    color: "rgba(255,255,255,0.68)",
+    marginBottom: "7px",
+  },
+
+  heroTitulo: {
     margin: 0,
-    color: "#143e28",
-    fontSize: "28px",
+    fontSize: "31px",
+    lineHeight: 1.15,
+    letterSpacing: "-0.5px",
   },
 
-  subtitulo: {
-    margin: "7px 0 0",
-    color: "#718078",
-    fontSize: "14px",
+  heroTituloMovil: {
+    fontSize: "25px",
   },
 
-  operacion: {
-    background: "white",
-    border: "1px solid #e0e8e2",
-    borderRadius: "11px",
-    padding: "11px 16px",
+  heroSubtitulo: {
+    margin: "8px 0 0",
     fontSize: "13px",
+    color: "rgba(255,255,255,0.76)",
+    lineHeight: 1.45,
   },
 
-  tarjetas: {
-    display: "grid",
-    gridTemplateColumns:
-      "repeat(6, minmax(0, 1fr))",
-    gap: "18px",
-    marginBottom: "22px",
-  },
-
-  tarjeta: {
-    background: "white",
-    border: "1px solid #e0e8e2",
-    borderRadius: "14px",
-    padding: "18px",
-    minHeight: "108px",
-  },
-
-  tarjetaEncabezado: {
+  estadoOperacion: {
+    flexShrink: 0,
     display: "flex",
     alignItems: "center",
-    justifyContent: "space-between",
-    gap: "10px",
-    marginBottom: "14px",
+    gap: "7px",
+    padding: "8px 11px",
+    borderRadius: "999px",
+    background: "rgba(255,255,255,0.12)",
+    border: "1px solid rgba(255,255,255,0.13)",
+    fontSize: "10px",
+    fontWeight: 700,
   },
 
-  tarjetaTitulo: {
-    color: "#718078",
-    fontSize: "13px",
-    fontWeight: 600,
+  puntoActivo: {
+    width: "7px",
+    height: "7px",
+    borderRadius: "50%",
+    background: "#85e39e",
+    boxShadow: "0 0 0 3px rgba(133,227,158,0.12)",
   },
 
-  iconoTarjeta: {
-    width: "34px",
-    height: "34px",
-    borderRadius: "9px",
-    background: "#edf4ef",
+  heroResumen: {
+    position: "relative",
+    zIndex: 2,
+    display: "flex",
+    alignItems: "center",
+    gap: "22px",
+    marginTop: "25px",
+  },
+
+  heroResumenLabel: {
+    display: "block",
+    fontSize: "9px",
+    textTransform: "uppercase",
+    letterSpacing: "0.8px",
+    color: "rgba(255,255,255,0.60)",
+    marginBottom: "4px",
+  },
+
+  heroResumenValor: {
+    display: "block",
+    fontSize: "15px",
+  },
+
+  heroSeparador: {
+    width: "1px",
+    height: "29px",
+    background: "rgba(255,255,255,0.16)",
+  },
+
+  tarjetasPrincipales: {
+    display: "grid",
+    gap: "12px",
+    marginBottom: "26px",
+  },
+
+  tarjetaPrincipal: {
+    border: "1px solid #dde6df",
+    borderRadius: "17px",
+    background: "white",
+    textAlign: "left",
+    cursor: "pointer",
+    fontFamily: "inherit",
+    color: "#20352a",
+    boxShadow: "0 3px 12px rgba(25,62,40,0.035)",
+    display: "flex",
+    flexDirection: "column",
+  },
+
+  tarjetaIcono: {
+    width: "37px",
+    height: "37px",
+    borderRadius: "11px",
+    background: "#edf5ef",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
+    fontSize: "18px",
+    marginBottom: "12px",
+  },
+
+  tarjetaTitulo: {
+    fontSize: "11px",
+    fontWeight: 700,
+    color: "#718078",
+    marginBottom: "4px",
   },
 
   tarjetaValor: {
     display: "block",
     color: "#176b3a",
-    fontSize: "26px",
+    lineHeight: 1.1,
     marginBottom: "6px",
+    letterSpacing: "-0.5px",
   },
 
   tarjetaDetalle: {
+    fontSize: "10px",
     color: "#98a39c",
-    fontSize: "12px",
   },
 
-  gridSuperior: {
+  seccion: {
+    marginBottom: "24px",
+  },
+
+  tituloSeccionFila: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+    marginBottom: "12px",
+  },
+
+  tituloSeccion: {
+    margin: 0,
+    fontSize: "16px",
+    color: "#244b34",
+  },
+
+  subtituloSeccion: {
+    margin: "3px 0 0",
+    color: "#89978e",
+    fontSize: "10px",
+  },
+
+  accesosGrid: {
     display: "grid",
-    gridTemplateColumns: "2fr 1fr",
-    gap: "20px",
-    marginBottom: "20px",
+    gap: "10px",
+  },
+
+  accesoRapido: {
+    minHeight: "85px",
+    border: "1px solid #dde6df",
+    borderRadius: "14px",
+    background: "white",
+    color: "#31523e",
+    fontFamily: "inherit",
+    fontSize: "11px",
+    fontWeight: 700,
+    cursor: "pointer",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "7px",
+  },
+
+  accesoIcono: {
+    width: "34px",
+    height: "34px",
+    borderRadius: "10px",
+    background: "#eef6f0",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "17px",
+  },
+
+  gridMedio: {
+    display: "grid",
+    gap: "16px",
+    marginBottom: "16px",
   },
 
   gridInferior: {
     display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: "20px",
+    gap: "16px",
   },
 
   panel: {
     background: "white",
-    border: "1px solid #e0e8e2",
-    borderRadius: "15px",
-    padding: "22px",
-    minHeight: "180px",
+    border: "1px solid #dde6df",
+    borderRadius: "17px",
+    padding: "19px",
+    boxShadow: "0 3px 12px rgba(25,62,40,0.025)",
+    boxSizing: "border-box",
+  },
+
+  panelHeader: {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: "10px",
+    marginBottom: "17px",
   },
 
   panelTitulo: {
-    margin: "0 0 20px",
-    fontSize: "17px",
+    margin: 0,
+    fontSize: "15px",
     color: "#244b34",
   },
 
-  filaResumen: {
+  panelSubtitulo: {
+    margin: "4px 0 0",
+    fontSize: "10px",
+    color: "#929f97",
+  },
+
+  botonVerTodo: {
+    border: "none",
+    background: "#edf6f0",
+    color: "#176b3a",
+    borderRadius: "8px",
+    padding: "7px 10px",
+    fontSize: "10px",
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+
+  listaLotes: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "10px",
+  },
+
+  loteItem: {
+    padding: "13px 14px",
+    borderRadius: "12px",
+    background: "#f7faf7",
+  },
+
+  loteFila: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: "13px 14px",
-    background: "#f7faf7",
-    borderRadius: "9px",
-    marginBottom: "9px",
+    gap: "12px",
   },
 
-  detalleFila: {
-    color: "#8a978f",
-    fontSize: "11px",
-    marginTop: "5px",
+  loteNombre: {
+    fontSize: "12px",
+    color: "#294a35",
   },
 
-  numeroVerde: {
+  loteDetalle: {
+    marginTop: "4px",
+    fontSize: "9px",
+    color: "#89978e",
+  },
+
+  loteCantidad: {
+    fontSize: "19px",
+    fontWeight: 800,
     color: "#176b3a",
   },
 
+  barraContenedor: {
+    height: "5px",
+    background: "#e3ece5",
+    borderRadius: "999px",
+    overflow: "hidden",
+    marginTop: "10px",
+  },
+
+  barra: {
+    height: "100%",
+    background:
+      "linear-gradient(90deg, #176b3a, #3a9b5d)",
+    borderRadius: "999px",
+  },
+
+  composicion: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "10px",
+  },
+
+  composicionItem: {
+    padding: "15px 12px",
+    background: "#f7faf7",
+    borderRadius: "12px",
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+  },
+
+  composicionIcono: {
+    width: "33px",
+    height: "33px",
+    borderRadius: "10px",
+    background: "#e7f2ea",
+    color: "#176b3a",
+    fontSize: "18px",
+    fontWeight: 800,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  composicionLabel: {
+    display: "block",
+    fontSize: "9px",
+    color: "#849188",
+    marginBottom: "3px",
+  },
+
+  composicionValor: {
+    display: "block",
+    fontSize: "19px",
+    color: "#244b34",
+  },
+
+  totalInventario: {
+    marginTop: "12px",
+    padding: "13px 14px",
+    borderTop: "1px solid #edf1ee",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    fontSize: "11px",
+    color: "#68786e",
+  },
+
+  resumenTitulo: {
+    display: "flex",
+    alignItems: "center",
+    gap: "9px",
+    marginBottom: "16px",
+  },
+
+  resumenIcono: {
+    width: "33px",
+    height: "33px",
+    borderRadius: "10px",
+    background: "#edf5ef",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "16px",
+  },
+
   filaDato: {
+    minHeight: "38px",
+    padding: "0 11px",
+    marginBottom: "7px",
+    borderRadius: "9px",
+    background: "#f7faf7",
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    background: "#f7faf7",
-    borderRadius: "8px",
-    padding: "12px 14px",
-    marginBottom: "10px",
-    fontSize: "13px",
+    fontSize: "11px",
+    color: "#68786e",
+  },
+
+  filaDestacada: {
+    background: "#edf6f0",
+    fontWeight: 700,
+  },
+
+  sinAlertas: {
+    minHeight: "130px",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "5px",
+    textAlign: "center",
+    color: "#819087",
+    fontSize: "10px",
+  },
+
+  checkAlertas: {
+    width: "36px",
+    height: "36px",
+    borderRadius: "50%",
+    background: "#e8f5ec",
+    color: "#176b3a",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "17px",
+    fontWeight: 800,
+    marginBottom: "3px",
   },
 
   vacio: {
-    minHeight: "130px",
+    minHeight: "140px",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     textAlign: "center",
     color: "#91a097",
-    fontSize: "14px",
+    fontSize: "12px",
+  },
+
+  pieDashboard: {
+    padding: "24px 0 5px",
+    textAlign: "center",
+    color: "#a0aaa4",
+    fontSize: "9px",
   },
 };
