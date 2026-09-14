@@ -14,10 +14,11 @@ type EventoSanitario = {
   id: string;
   lote_id: string | null;
   fecha: string;
-  tipo: string;
-  descripcion: string | null;
+  tipo_evento: string;
   cantidad_animales: number | null;
-  responsable: string | null;
+  diagnostico: string | null;
+  descripcion: string | null;
+  veterinario: string | null;
   observaciones: string | null;
   gan_lotes_ganado?: {
     nombre: string;
@@ -40,10 +41,11 @@ export default function SanidadPage() {
   const [form, setForm] = useState({
     fecha: new Date().toISOString().split("T")[0],
     lote_id: "",
-    tipo: "",
+    tipo_evento: "",
     cantidad_animales: "",
+    diagnostico: "",
     descripcion: "",
-    responsable: "",
+    veterinario: "",
     observaciones: "",
   });
 
@@ -112,17 +114,19 @@ export default function SanidadPage() {
         id,
         lote_id,
         fecha,
-        tipo,
-        descripcion,
+        tipo_evento,
         cantidad_animales,
-        responsable,
+        diagnostico,
+        descripcion,
+        veterinario,
         observaciones,
         gan_lotes_ganado (
           nombre
         )
       `)
       .eq("finca_id", idFinca)
-      .order("fecha", { ascending: false });
+      .order("fecha", { ascending: false })
+      .order("created_at", { ascending: false });
 
     if (error) {
       setMensaje(
@@ -161,7 +165,7 @@ export default function SanidadPage() {
       return;
     }
 
-    if (!form.tipo) {
+    if (!form.tipo_evento) {
       setMensaje(
         "Debes seleccionar el tipo de evento sanitario."
       );
@@ -175,6 +179,20 @@ export default function SanidadPage() {
     if (!cantidad || cantidad <= 0) {
       setMensaje(
         "La cantidad de animales debe ser mayor a cero."
+      );
+      return;
+    }
+
+    const loteSeleccionado = lotes.find(
+      (lote) => lote.id === form.lote_id
+    );
+
+    if (
+      loteSeleccionado &&
+      cantidad > loteSeleccionado.cantidad_total
+    ) {
+      setMensaje(
+        `El lote tiene ${loteSeleccionado.cantidad_total} animales. No puedes registrar ${cantidad}.`
       );
       return;
     }
@@ -196,12 +214,14 @@ export default function SanidadPage() {
         finca_id: fincaId,
         lote_id: form.lote_id,
         fecha: form.fecha,
-        tipo: form.tipo,
+        tipo_evento: form.tipo_evento,
+        cantidad_animales: cantidad,
+        diagnostico:
+          form.diagnostico.trim() || null,
         descripcion:
           form.descripcion.trim() || null,
-        cantidad_animales: cantidad,
-        responsable:
-          form.responsable.trim() || null,
+        veterinario:
+          form.veterinario.trim() || null,
         observaciones:
           form.observaciones.trim() || null,
         registrado_por: user.id,
@@ -216,13 +236,13 @@ export default function SanidadPage() {
     }
 
     setForm({
-      fecha:
-        new Date().toISOString().split("T")[0],
+      fecha: new Date().toISOString().split("T")[0],
       lote_id: "",
-      tipo: "",
+      tipo_evento: "",
       cantidad_animales: "",
+      diagnostico: "",
       descripcion: "",
-      responsable: "",
+      veterinario: "",
       observaciones: "",
     });
 
@@ -293,15 +313,11 @@ export default function SanidadPage() {
             style={{
               ...estilos.mensaje,
               background:
-                mensaje.includes(
-                  "correctamente"
-                )
+                mensaje.includes("correctamente")
                   ? "#edf8f0"
                   : "#fff1f1",
               color:
-                mensaje.includes(
-                  "correctamente"
-                )
+                mensaje.includes("correctamente")
                   ? "#176b3a"
                   : "#b42318",
             }}
@@ -400,11 +416,12 @@ export default function SanidadPage() {
                 </label>
 
                 <select
-                  value={form.tipo}
+                  value={form.tipo_evento}
                   onChange={(e) =>
                     setForm({
                       ...form,
-                      tipo: e.target.value,
+                      tipo_evento:
+                        e.target.value,
                     })
                   }
                   style={estilos.input}
@@ -430,7 +447,7 @@ export default function SanidadPage() {
                     Vitaminas
                   </option>
 
-                  <option value="Revisión">
+                  <option value="Revisión veterinaria">
                     Revisión veterinaria
                   </option>
 
@@ -467,43 +484,63 @@ export default function SanidadPage() {
 
               <div>
                 <label style={estilos.label}>
-                  Responsable
+                  Veterinario / responsable
                 </label>
 
                 <input
                   type="text"
-                  value={form.responsable}
+                  value={form.veterinario}
                   onChange={(e) =>
                     setForm({
                       ...form,
-                      responsable:
+                      veterinario:
                         e.target.value,
                     })
                   }
-                  placeholder="Ej. Veterinario / encargado"
+                  placeholder="Nombre del responsable"
                   style={estilos.input}
                 />
               </div>
 
               <div>
                 <label style={estilos.label}>
-                  Descripción
+                  Diagnóstico
                 </label>
 
                 <input
                   type="text"
-                  value={form.descripcion}
+                  value={form.diagnostico}
                   onChange={(e) =>
                     setForm({
                       ...form,
-                      descripcion:
+                      diagnostico:
                         e.target.value,
                     })
                   }
-                  placeholder="Ej. Vacuna contra..."
+                  placeholder="Si corresponde"
                   style={estilos.input}
                 />
               </div>
+            </div>
+
+            <div style={{ marginTop: "18px" }}>
+              <label style={estilos.label}>
+                Descripción
+              </label>
+
+              <input
+                type="text"
+                value={form.descripcion}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    descripcion:
+                      e.target.value,
+                  })
+                }
+                placeholder="Ej. Vacuna aplicada, procedimiento realizado..."
+                style={estilos.input}
+              />
             </div>
 
             <div style={{ marginTop: "18px" }}>
@@ -605,11 +642,15 @@ export default function SanidadPage() {
                     </th>
 
                     <th style={estilos.th}>
+                      Diagnóstico
+                    </th>
+
+                    <th style={estilos.th}>
                       Descripción
                     </th>
 
                     <th style={estilos.th}>
-                      Responsable
+                      Veterinario
                     </th>
 
                     <th style={estilos.th}>
@@ -638,25 +679,33 @@ export default function SanidadPage() {
                         <span
                           style={estilos.tipo}
                         >
-                          {evento.tipo}
+                          {evento.tipo_evento}
                         </span>
                       </td>
 
                       <td style={estilos.td}>
-                        {evento.cantidad_animales ||
+                        {evento.cantidad_animales ??
                           "—"}
                       </td>
 
                       <td style={estilos.td}>
-                        {evento.descripcion || "—"}
+                        {evento.diagnostico ||
+                          "—"}
                       </td>
 
                       <td style={estilos.td}>
-                        {evento.responsable || "—"}
+                        {evento.descripcion ||
+                          "—"}
                       </td>
 
                       <td style={estilos.td}>
-                        {evento.observaciones || "—"}
+                        {evento.veterinario ||
+                          "—"}
+                      </td>
+
+                      <td style={estilos.td}>
+                        {evento.observaciones ||
+                          "—"}
                       </td>
                     </tr>
                   ))}
@@ -891,6 +940,7 @@ const estilos: Record<
     color: "#66776c",
     fontWeight: 700,
     borderBottom: "1px solid #edf1ee",
+    whiteSpace: "nowrap",
   },
 
   td: {
@@ -907,6 +957,7 @@ const estilos: Record<
     borderRadius: "999px",
     fontSize: "11px",
     fontWeight: 700,
+    whiteSpace: "nowrap",
   },
 
   vacio: {
