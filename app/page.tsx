@@ -11,6 +11,7 @@ export default function Home() {
 
   const iniciarSesion = async (e: React.FormEvent) => {
     e.preventDefault();
+
     setLoading(true);
     setMensaje("");
 
@@ -71,7 +72,12 @@ export default function Home() {
           border: "1px solid #e4ebe5",
         }}
       >
-        <div style={{ textAlign: "center", marginBottom: "34px" }}>
+        <div
+          style={{
+            textAlign: "center",
+            marginBottom: "34px",
+          }}
+        >
           <div
             style={{
               width: "64px",
