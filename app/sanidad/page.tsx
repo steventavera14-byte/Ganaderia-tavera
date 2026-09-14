@@ -25,6 +25,17 @@ type EventoSanitario = {
   } | null;
 };
 
+const nombresTipos: Record<string, string> = {
+  vacunacion: "Vacunación",
+  desparasitacion: "Desparasitación",
+  tratamiento: "Tratamiento",
+  enfermedad: "Enfermedad",
+  prevencion: "Prevención",
+  vitaminizacion: "Vitaminización",
+  revision: "Revisión veterinaria",
+  otro: "Otro",
+};
+
 export default function SanidadPage() {
   const [loading, setLoading] = useState(true);
   const [guardando, setGuardando] = useState(false);
@@ -158,6 +169,7 @@ export default function SanidadPage() {
     e: React.FormEvent
   ) => {
     e.preventDefault();
+
     setMensaje("");
 
     if (!form.lote_id) {
@@ -431,31 +443,35 @@ export default function SanidadPage() {
                     Seleccionar
                   </option>
 
-                  <option value="Vacunación">
+                  <option value="vacunacion">
                     Vacunación
                   </option>
 
-                  <option value="Desparasitación">
+                  <option value="desparasitacion">
                     Desparasitación
                   </option>
 
-                  <option value="Tratamiento">
+                  <option value="tratamiento">
                     Tratamiento
                   </option>
 
-                  <option value="Vitaminas">
-                    Vitaminas
+                  <option value="enfermedad">
+                    Enfermedad
                   </option>
 
-                  <option value="Revisión veterinaria">
+                  <option value="prevencion">
+                    Prevención
+                  </option>
+
+                  <option value="vitaminizacion">
+                    Vitaminización
+                  </option>
+
+                  <option value="revision">
                     Revisión veterinaria
                   </option>
 
-                  <option value="Curación">
-                    Curación
-                  </option>
-
-                  <option value="Otro">
+                  <option value="otro">
                     Otro
                   </option>
                 </select>
@@ -679,7 +695,10 @@ export default function SanidadPage() {
                         <span
                           style={estilos.tipo}
                         >
-                          {evento.tipo_evento}
+                          {nombresTipos[
+                            evento.tipo_evento
+                          ] ||
+                            evento.tipo_evento}
                         </span>
                       </td>
 
