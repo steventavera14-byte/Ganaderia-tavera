@@ -145,25 +145,23 @@ export default function PersonalPage() {
   const cargarTrabajadores = async (idFinca: string) => {
     const { data, error: errorCarga } = await supabase
       .from("gan_trabajadores")
-      .select(
-        `
-          id,
-          finca_id,
-          nombre,
-          apellido,
-          documento,
-          telefono,
-          cargo,
-          fecha_ingreso,
-          fecha_salida,
-          estado,
-          tipo_pago,
-          salario_base,
-          moneda,
-          observaciones,
-          created_at
-        `
-      )
+      .select(`
+        id,
+        finca_id,
+        nombre,
+        apellido,
+        documento,
+        telefono,
+        cargo,
+        fecha_ingreso,
+        fecha_salida,
+        estado,
+        tipo_pago,
+        salario_base,
+        moneda,
+        observaciones,
+        created_at
+      `)
       .eq("finca_id", idFinca)
       .order("nombre", { ascending: true });
 
@@ -183,9 +181,7 @@ export default function PersonalPage() {
       .order("created_at", { ascending: false });
 
     if (errorArchivos) {
-      setError(
-        `Error al cargar documentos: ${errorArchivos.message}`
-      );
+      setError(`Error al cargar documentos: ${errorArchivos.message}`);
       return;
     }
 
@@ -193,26 +189,17 @@ export default function PersonalPage() {
   };
 
   const totalActivos = useMemo(
-    () =>
-      trabajadores.filter(
-        (trabajador) => trabajador.estado === "activo"
-      ).length,
+    () => trabajadores.filter((t) => t.estado === "activo").length,
     [trabajadores]
   );
 
   const totalVacaciones = useMemo(
-    () =>
-      trabajadores.filter(
-        (trabajador) => trabajador.estado === "vacaciones"
-      ).length,
+    () => trabajadores.filter((t) => t.estado === "vacaciones").length,
     [trabajadores]
   );
 
   const totalLicencia = useMemo(
-    () =>
-      trabajadores.filter(
-        (trabajador) => trabajador.estado === "licencia"
-      ).length,
+    () => trabajadores.filter((t) => t.estado === "licencia").length,
     [trabajadores]
   );
 
@@ -270,10 +257,7 @@ export default function PersonalPage() {
     setError("");
   };
 
-  const cambiarCampo = (
-    campo: keyof Formulario,
-    valor: string
-  ) => {
+  const cambiarCampo = (campo: keyof Formulario, valor: string) => {
     setFormulario((anterior) => ({
       ...anterior,
       [campo]: valor,
@@ -327,15 +311,12 @@ export default function PersonalPage() {
         .eq("finca_id", fincaId);
 
       if (errorGuardar) {
-        setError(
-          `Error al actualizar trabajador: ${errorGuardar.message}`
-        );
+        setError(`Error al actualizar trabajador: ${errorGuardar.message}`);
         setGuardando(false);
         return;
       }
 
       setMensaje("Trabajador actualizado correctamente.");
-
       await cargarTrabajadores(fincaId);
       setGuardando(false);
       return;
@@ -346,9 +327,7 @@ export default function PersonalPage() {
       .insert(datos);
 
     if (errorGuardar) {
-      setError(
-        `Error al registrar trabajador: ${errorGuardar.message}`
-      );
+      setError(`Error al registrar trabajador: ${errorGuardar.message}`);
       setGuardando(false);
       return;
     }
@@ -404,9 +383,7 @@ export default function PersonalPage() {
       archivoSeleccionado.name.split(".").pop()?.toLowerCase() || "archivo";
 
     const nombreSeguro = `${tipoArchivo}-${Date.now()}.${extension}`;
-
-    const rutaStorage =
-      `${fincaId}/${editandoId}/${nombreSeguro}`;
+    const rutaStorage = `${fincaId}/${editandoId}/${nombreSeguro}`;
 
     const { error: errorStorage } = await supabase.storage
       .from("gan-personal")
@@ -417,9 +394,7 @@ export default function PersonalPage() {
       });
 
     if (errorStorage) {
-      setError(
-        `Error al subir el archivo: ${errorStorage.message}`
-      );
+      setError(`Error al subir el archivo: ${errorStorage.message}`);
       setSubiendoArchivo(false);
       return;
     }
@@ -439,13 +414,9 @@ export default function PersonalPage() {
       });
 
     if (errorRegistro) {
-      await supabase.storage
-        .from("gan-personal")
-        .remove([rutaStorage]);
+      await supabase.storage.from("gan-personal").remove([rutaStorage]);
 
-      setError(
-        `Error al registrar el documento: ${errorRegistro.message}`
-      );
+      setError(`Error al registrar el documento: ${errorRegistro.message}`);
       setSubiendoArchivo(false);
       return;
     }
@@ -487,9 +458,7 @@ export default function PersonalPage() {
     window.open(data.signedUrl, "_blank", "noopener,noreferrer");
   };
 
-  const eliminarDocumento = async (
-    archivo: ArchivoTrabajador
-  ) => {
+  const eliminarDocumento = async (archivo: ArchivoTrabajador) => {
     const confirmar = window.confirm(
       `¿Eliminar "${archivo.nombre_archivo}"?`
     );
@@ -504,9 +473,7 @@ export default function PersonalPage() {
       .remove([archivo.ruta_storage]);
 
     if (errorStorage) {
-      setError(
-        `No se pudo eliminar el archivo: ${errorStorage.message}`
-      );
+      setError(`No se pudo eliminar el archivo: ${errorStorage.message}`);
       return;
     }
 
@@ -531,9 +498,7 @@ export default function PersonalPage() {
   };
 
   const nombreCompleto = (trabajador: Trabajador) =>
-    [trabajador.nombre, trabajador.apellido]
-      .filter(Boolean)
-      .join(" ");
+    [trabajador.nombre, trabajador.apellido].filter(Boolean).join(" ");
 
   const mostrarFecha = (fecha: string | null) => {
     if (!fecha) return "—";
@@ -548,13 +513,10 @@ export default function PersonalPage() {
   ) => {
     if (valor === null) return "—";
 
-    return `${moneda || "BOB"} ${Number(valor).toLocaleString(
-      "es-BO",
-      {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }
-    )}`;
+    return `${moneda || "BOB"} ${Number(valor).toLocaleString("es-BO", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
   };
 
   const etiquetaEstado = (estado: string) => {
@@ -589,12 +551,8 @@ export default function PersonalPage() {
     }
   };
 
-  const etiquetaTipoArchivo = (tipo: string) => {
-    return (
-      tiposArchivo.find((item) => item.valor === tipo)?.texto ||
-      tipo
-    );
-  };
+  const etiquetaTipoArchivo = (tipo: string) =>
+    tiposArchivo.find((item) => item.valor === tipo)?.texto || tipo;
 
   const mostrarTamano = (bytes: number | null) => {
     if (!bytes) return "—";
@@ -610,8 +568,8 @@ export default function PersonalPage() {
     return (
       <>
         <Sidebar />
-        <main style={estilos.main}>
-          <div style={estilos.cargando}>Cargando personal...</div>
+        <main className="personal-main">
+          <div className="cargando">Cargando personal...</div>
         </main>
       </>
     );
@@ -621,86 +579,59 @@ export default function PersonalPage() {
     <>
       <Sidebar />
 
-      <main style={estilos.main}>
-        <div style={estilos.encabezado}>
+      <main className="personal-main">
+        <div className="encabezado">
           <div>
-            <h1 style={estilos.titulo}>Personal</h1>
-            <p style={estilos.subtitulo}>
-              Gestión de trabajadores de la finca
-            </p>
+            <h1>Personal</h1>
+            <p>Gestión de trabajadores de la finca</p>
           </div>
 
           {!mostrarFormulario ? (
-            <button
-              onClick={abrirNuevo}
-              style={estilos.botonPrincipal}
-            >
+            <button onClick={abrirNuevo} className="btn-principal">
               + Registrar trabajador
             </button>
           ) : (
-            <button
-              onClick={cancelarFormulario}
-              style={estilos.botonSecundario}
-            >
+            <button onClick={cancelarFormulario} className="btn-secundario">
               Cerrar ficha
             </button>
           )}
         </div>
 
-        {error && (
-          <div style={estilos.alertaError}>{error}</div>
-        )}
+        {error && <div className="alerta error">{error}</div>}
+        {mensaje && <div className="alerta exito">{mensaje}</div>}
 
-        {mensaje && (
-          <div style={estilos.alertaExito}>{mensaje}</div>
-        )}
-
-        <section style={estilos.tarjetas}>
-          <div style={estilos.tarjeta}>
-            <span style={estilos.tarjetaLabel}>
-              Personal activo
-            </span>
-            <strong style={estilos.tarjetaNumero}>
-              {totalActivos}
-            </strong>
-            <span style={estilos.tarjetaTexto}>
-              Trabajadores activos
-            </span>
+        <section className="resumen">
+          <div className="tarjeta-resumen">
+            <span>Personal activo</span>
+            <strong>{totalActivos}</strong>
+            <small>Trabajadores activos</small>
           </div>
 
-          <div style={estilos.tarjeta}>
-            <span style={estilos.tarjetaLabel}>Vacaciones</span>
-            <strong style={estilos.tarjetaNumero}>
-              {totalVacaciones}
-            </strong>
-            <span style={estilos.tarjetaTexto}>
-              Personal de vacaciones
-            </span>
+          <div className="tarjeta-resumen">
+            <span>Vacaciones</span>
+            <strong>{totalVacaciones}</strong>
+            <small>Personal de vacaciones</small>
           </div>
 
-          <div style={estilos.tarjeta}>
-            <span style={estilos.tarjetaLabel}>Licencias</span>
-            <strong style={estilos.tarjetaNumero}>
-              {totalLicencia}
-            </strong>
-            <span style={estilos.tarjetaTexto}>
-              Personal con licencia
-            </span>
+          <div className="tarjeta-resumen">
+            <span>Licencias</span>
+            <strong>{totalLicencia}</strong>
+            <small>Personal con licencia</small>
           </div>
         </section>
 
         {mostrarFormulario && (
           <>
-            <section style={estilos.panel}>
-              <div style={estilos.panelTituloContenedor}>
+            <section className="panel">
+              <div className="panel-header">
                 <div>
-                  <h2 style={estilos.panelTitulo}>
+                  <h2>
                     {editandoId
                       ? "Ficha del trabajador"
                       : "Registrar trabajador"}
                   </h2>
 
-                  <p style={estilos.panelSubtitulo}>
+                  <p>
                     {editandoId
                       ? "Puedes modificar esta información cuando lo necesites."
                       : "Completa la información del nuevo trabajador."}
@@ -708,14 +639,13 @@ export default function PersonalPage() {
                 </div>
               </div>
 
-              <div style={estilos.formGrid}>
+              <div className="form-grid">
                 <Campo label="Nombre *">
                   <input
                     value={formulario.nombre}
                     onChange={(e) =>
                       cambiarCampo("nombre", e.target.value)
                     }
-                    style={estilos.input}
                     placeholder="Nombre"
                   />
                 </Campo>
@@ -726,7 +656,6 @@ export default function PersonalPage() {
                     onChange={(e) =>
                       cambiarCampo("apellido", e.target.value)
                     }
-                    style={estilos.input}
                     placeholder="Apellido"
                   />
                 </Campo>
@@ -737,7 +666,6 @@ export default function PersonalPage() {
                     onChange={(e) =>
                       cambiarCampo("documento", e.target.value)
                     }
-                    style={estilos.input}
                     placeholder="Número de documento"
                   />
                 </Campo>
@@ -748,7 +676,6 @@ export default function PersonalPage() {
                     onChange={(e) =>
                       cambiarCampo("telefono", e.target.value)
                     }
-                    style={estilos.input}
                     placeholder="Teléfono"
                   />
                 </Campo>
@@ -759,7 +686,6 @@ export default function PersonalPage() {
                     onChange={(e) =>
                       cambiarCampo("cargo", e.target.value)
                     }
-                    style={estilos.input}
                     placeholder="Ej. Encargado, tractorista..."
                   />
                 </Campo>
@@ -770,12 +696,9 @@ export default function PersonalPage() {
                     onChange={(e) =>
                       cambiarCampo("estado", e.target.value)
                     }
-                    style={estilos.input}
                   >
                     <option value="activo">Activo</option>
-                    <option value="vacaciones">
-                      Vacaciones
-                    </option>
+                    <option value="vacaciones">Vacaciones</option>
                     <option value="licencia">Licencia</option>
                     <option value="retirado">Retirado</option>
                   </select>
@@ -786,12 +709,8 @@ export default function PersonalPage() {
                     type="date"
                     value={formulario.fecha_ingreso}
                     onChange={(e) =>
-                      cambiarCampo(
-                        "fecha_ingreso",
-                        e.target.value
-                      )
+                      cambiarCampo("fecha_ingreso", e.target.value)
                     }
-                    style={estilos.input}
                   />
                 </Campo>
 
@@ -800,12 +719,8 @@ export default function PersonalPage() {
                     type="date"
                     value={formulario.fecha_salida}
                     onChange={(e) =>
-                      cambiarCampo(
-                        "fecha_salida",
-                        e.target.value
-                      )
+                      cambiarCampo("fecha_salida", e.target.value)
                     }
-                    style={estilos.input}
                   />
                 </Campo>
 
@@ -815,13 +730,10 @@ export default function PersonalPage() {
                     onChange={(e) =>
                       cambiarCampo("tipo_pago", e.target.value)
                     }
-                    style={estilos.input}
                   >
                     <option value="diario">Diario</option>
                     <option value="semanal">Semanal</option>
-                    <option value="quincenal">
-                      Quincenal
-                    </option>
+                    <option value="quincenal">Quincenal</option>
                     <option value="mensual">Mensual</option>
                     <option value="otro">Otro</option>
                   </select>
@@ -834,12 +746,8 @@ export default function PersonalPage() {
                     step="0.01"
                     value={formulario.salario_base}
                     onChange={(e) =>
-                      cambiarCampo(
-                        "salario_base",
-                        e.target.value
-                      )
+                      cambiarCampo("salario_base", e.target.value)
                     }
-                    style={estilos.input}
                     placeholder="0.00"
                   />
                 </Campo>
@@ -850,40 +758,28 @@ export default function PersonalPage() {
                     onChange={(e) =>
                       cambiarCampo("moneda", e.target.value)
                     }
-                    style={estilos.input}
                   >
-                    <option value="BOB">
-                      BOB - Bolivianos
-                    </option>
-                    <option value="USD">
-                      USD - Dólares
-                    </option>
+                    <option value="BOB">BOB - Bolivianos</option>
+                    <option value="USD">USD - Dólares</option>
                   </select>
                 </Campo>
               </div>
 
-              <div style={estilos.campoCompleto}>
-                <label style={estilos.label}>
-                  Observaciones
-                </label>
-
+              <div className="campo-completo">
+                <label>Observaciones</label>
                 <textarea
                   value={formulario.observaciones}
                   onChange={(e) =>
-                    cambiarCampo(
-                      "observaciones",
-                      e.target.value
-                    )
+                    cambiarCampo("observaciones", e.target.value)
                   }
-                  style={estilos.textarea}
                   placeholder="Información adicional del trabajador..."
                 />
               </div>
 
-              <div style={estilos.accionesFormulario}>
+              <div className="acciones-form">
                 <button
                   onClick={cancelarFormulario}
-                  style={estilos.botonSecundario}
+                  className="btn-secundario"
                   disabled={guardando}
                 >
                   Cancelar
@@ -891,7 +787,7 @@ export default function PersonalPage() {
 
                 <button
                   onClick={guardarTrabajador}
-                  style={estilos.botonPrincipal}
+                  className="btn-principal"
                   disabled={guardando}
                 >
                   {guardando
@@ -904,38 +800,27 @@ export default function PersonalPage() {
             </section>
 
             {editandoId && (
-              <section style={estilos.panel}>
-                <div style={estilos.panelTituloContenedor}>
+              <section className="panel">
+                <div className="panel-header documentos-header">
                   <div>
-                    <h2 style={estilos.panelTitulo}>
-                      Documentos del trabajador
-                    </h2>
-
-                    <p style={estilos.panelSubtitulo}>
-                      Foto, CI, licencia, contrato, certificados
-                      y otros documentos.
+                    <h2>Documentos del trabajador</h2>
+                    <p>
+                      Foto, CI, licencia, contrato, certificados y otros
+                      documentos.
                     </p>
                   </div>
 
-                  <div style={estilos.privado}>
-                    🔒 Archivos privados
-                  </div>
+                  <div className="privado">🔒 Archivos privados</div>
                 </div>
 
-                <div style={estilos.documentosFormulario}>
+                <div className="documentos-form">
                   <Campo label="Tipo de documento">
                     <select
                       value={tipoArchivo}
-                      onChange={(e) =>
-                        setTipoArchivo(e.target.value)
-                      }
-                      style={estilos.input}
+                      onChange={(e) => setTipoArchivo(e.target.value)}
                     >
                       {tiposArchivo.map((tipo) => (
-                        <option
-                          key={tipo.valor}
-                          value={tipo.valor}
-                        >
+                        <option key={tipo.valor} value={tipo.valor}>
                           {tipo.texto}
                         </option>
                       ))}
@@ -948,11 +833,9 @@ export default function PersonalPage() {
                       type="file"
                       accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf"
                       onChange={(e) =>
-                        setArchivoSeleccionado(
-                          e.target.files?.[0] || null
-                        )
+                        setArchivoSeleccionado(e.target.files?.[0] || null)
                       }
-                      style={estilos.inputArchivo}
+                      className="archivo-input"
                     />
                   </Campo>
 
@@ -962,15 +845,14 @@ export default function PersonalPage() {
                       onChange={(e) =>
                         setDescripcionArchivo(e.target.value)
                       }
-                      style={estilos.input}
                       placeholder="Opcional"
                     />
                   </Campo>
 
-                  <div style={estilos.subirContenedor}>
+                  <div className="subir-contenedor">
                     <button
                       onClick={subirDocumento}
-                      style={estilos.botonPrincipal}
+                      className="btn-principal"
                       disabled={subiendoArchivo}
                     >
                       {subiendoArchivo
@@ -980,107 +862,144 @@ export default function PersonalPage() {
                   </div>
                 </div>
 
-                <div style={estilos.notaArchivo}>
-                  Formatos permitidos: JPG, PNG, WEBP y PDF.
-                  Máximo 10 MB por archivo.
+                <div className="nota-archivo">
+                  Formatos permitidos: JPG, PNG, WEBP y PDF. Máximo 10 MB
+                  por archivo.
                 </div>
 
                 {archivos.length === 0 ? (
-                  <div style={estilos.vacioDocumentos}>
-                    <div style={estilos.vacioIcono}>📁</div>
-                    <strong>
-                      No hay documentos registrados
-                    </strong>
+                  <div className="vacio-documentos">
+                    <div className="vacio-icono">📁</div>
+                    <strong>No hay documentos registrados</strong>
                     <span>
-                      Agrega la foto, CI u otro documento del
-                      trabajador.
+                      Agrega la foto, CI u otro documento del trabajador.
                     </span>
                   </div>
                 ) : (
-                  <div style={estilos.tablaContenedor}>
-                    <table style={estilos.tabla}>
-                      <thead>
-                        <tr>
-                          <th style={estilos.th}>Tipo</th>
-                          <th style={estilos.th}>Archivo</th>
-                          <th style={estilos.th}>Descripción</th>
-                          <th style={estilos.th}>Tamaño</th>
-                          <th style={estilos.th}>Fecha</th>
-                          <th style={estilos.th}></th>
-                        </tr>
-                      </thead>
+                  <>
+                    <div className="documentos-desktop">
+                      <div className="tabla-wrap">
+                        <table>
+                          <thead>
+                            <tr>
+                              <th>Tipo</th>
+                              <th>Archivo</th>
+                              <th>Descripción</th>
+                              <th>Tamaño</th>
+                              <th>Fecha</th>
+                              <th></th>
+                            </tr>
+                          </thead>
 
-                      <tbody>
-                        {archivos.map((archivo) => (
-                          <tr key={archivo.id}>
-                            <td style={estilos.td}>
+                          <tbody>
+                            {archivos.map((archivo) => (
+                              <tr key={archivo.id}>
+                                <td>
+                                  <strong>
+                                    {etiquetaTipoArchivo(archivo.tipo)}
+                                  </strong>
+                                </td>
+
+                                <td>{archivo.nombre_archivo}</td>
+                                <td>{archivo.descripcion || "—"}</td>
+                                <td>
+                                  {mostrarTamano(archivo.tamano_bytes)}
+                                </td>
+                                <td>
+                                  {new Date(
+                                    archivo.created_at
+                                  ).toLocaleDateString("es-BO")}
+                                </td>
+
+                                <td>
+                                  <div className="acciones-archivo">
+                                    <button
+                                      onClick={() =>
+                                        abrirDocumento(archivo)
+                                      }
+                                      className="btn-ver"
+                                    >
+                                      Ver
+                                    </button>
+
+                                    <button
+                                      onClick={() =>
+                                        eliminarDocumento(archivo)
+                                      }
+                                      className="btn-eliminar"
+                                    >
+                                      Eliminar
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div className="documentos-mobile">
+                      {archivos.map((archivo) => (
+                        <div
+                          key={archivo.id}
+                          className="documento-card"
+                        >
+                          <div className="documento-top">
+                            <div>
                               <strong>
-                                {etiquetaTipoArchivo(
-                                  archivo.tipo
-                                )}
+                                {etiquetaTipoArchivo(archivo.tipo)}
                               </strong>
-                            </td>
+                              <span>{archivo.nombre_archivo}</span>
+                            </div>
 
-                            <td style={estilos.td}>
-                              {archivo.nombre_archivo}
-                            </td>
+                            <span className="documento-tamano">
+                              {mostrarTamano(archivo.tamano_bytes)}
+                            </span>
+                          </div>
 
-                            <td style={estilos.td}>
-                              {archivo.descripcion || "—"}
-                            </td>
+                          {archivo.descripcion && (
+                            <p>{archivo.descripcion}</p>
+                          )}
 
-                            <td style={estilos.td}>
-                              {mostrarTamano(
-                                archivo.tamano_bytes
-                              )}
-                            </td>
+                          <small>
+                            {new Date(
+                              archivo.created_at
+                            ).toLocaleDateString("es-BO")}
+                          </small>
 
-                            <td style={estilos.td}>
-                              {new Date(
-                                archivo.created_at
-                              ).toLocaleDateString("es-BO")}
-                            </td>
+                          <div className="documento-botones">
+                            <button
+                              onClick={() => abrirDocumento(archivo)}
+                              className="btn-ver"
+                            >
+                              Ver
+                            </button>
 
-                            <td style={estilos.td}>
-                              <div style={estilos.accionesArchivo}>
-                                <button
-                                  onClick={() =>
-                                    abrirDocumento(archivo)
-                                  }
-                                  style={estilos.botonVer}
-                                >
-                                  Ver
-                                </button>
-
-                                <button
-                                  onClick={() =>
-                                    eliminarDocumento(archivo)
-                                  }
-                                  style={estilos.botonEliminar}
-                                >
-                                  Eliminar
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                            <button
+                              onClick={() =>
+                                eliminarDocumento(archivo)
+                              }
+                              className="btn-eliminar"
+                            >
+                              Eliminar
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
                 )}
               </section>
             )}
           </>
         )}
 
-        <section style={estilos.panel}>
-          <div style={estilos.panelTituloContenedor}>
+        <section className="panel">
+          <div className="panel-header">
             <div>
-              <h2 style={estilos.panelTitulo}>
-                Personal registrado
-              </h2>
-
-              <p style={estilos.panelSubtitulo}>
+              <h2>Personal registrado</h2>
+              <p>
                 {trabajadores.length}{" "}
                 {trabajadores.length === 1
                   ? "trabajador"
@@ -1090,114 +1009,995 @@ export default function PersonalPage() {
           </div>
 
           {trabajadores.length === 0 ? (
-            <div style={estilos.vacio}>
-              <div style={estilos.vacioIcono}>👥</div>
+            <div className="vacio">
+              <div className="vacio-icono">👥</div>
               <strong>No hay personal registrado</strong>
-              <span>
-                Registra el primer trabajador de la finca.
-              </span>
+              <span>Registra el primer trabajador de la finca.</span>
             </div>
           ) : (
-            <div style={estilos.tablaContenedor}>
-              <table style={estilos.tabla}>
-                <thead>
-                  <tr>
-                    <th style={estilos.th}>Trabajador</th>
-                    <th style={estilos.th}>Documento</th>
-                    <th style={estilos.th}>Cargo</th>
-                    <th style={estilos.th}>Teléfono</th>
-                    <th style={estilos.th}>Ingreso</th>
-                    <th style={estilos.th}>Estado</th>
-                    <th style={estilos.th}>Pago</th>
-                    <th style={estilos.th}>Salario</th>
-                    <th style={estilos.th}></th>
-                  </tr>
-                </thead>
+            <>
+              <div className="personal-desktop">
+                <div className="tabla-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Trabajador</th>
+                        <th>Documento</th>
+                        <th>Cargo</th>
+                        <th>Teléfono</th>
+                        <th>Ingreso</th>
+                        <th>Estado</th>
+                        <th>Pago</th>
+                        <th>Salario</th>
+                        <th></th>
+                      </tr>
+                    </thead>
 
-                <tbody>
-                  {trabajadores.map((trabajador) => (
-                    <tr key={trabajador.id}>
-                      <td style={estilos.td}>
-                        <div style={estilos.trabajadorCelda}>
-                          <div style={estilos.avatar}>
-                            {trabajador.nombre
-                              ?.charAt(0)
-                              .toUpperCase()}
-                          </div>
+                    <tbody>
+                      {trabajadores.map((trabajador) => (
+                        <tr key={trabajador.id}>
+                          <td>
+                            <div className="trabajador-celda">
+                              <div className="avatar">
+                                {trabajador.nombre
+                                  ?.charAt(0)
+                                  .toUpperCase()}
+                              </div>
+                              <strong>
+                                {nombreCompleto(trabajador)}
+                              </strong>
+                            </div>
+                          </td>
 
+                          <td>{trabajador.documento || "—"}</td>
+                          <td>{trabajador.cargo || "—"}</td>
+                          <td>{trabajador.telefono || "—"}</td>
+                          <td>
+                            {mostrarFecha(trabajador.fecha_ingreso)}
+                          </td>
+
+                          <td>
+                            <span
+                              className={`estado ${
+                                trabajador.estado === "activo"
+                                  ? "estado-activo"
+                                  : trabajador.estado === "retirado"
+                                  ? "estado-retirado"
+                                  : "estado-temporal"
+                              }`}
+                            >
+                              {etiquetaEstado(trabajador.estado)}
+                            </span>
+                          </td>
+
+                          <td>
+                            {etiquetaPago(trabajador.tipo_pago)}
+                          </td>
+
+                          <td>
+                            {mostrarDinero(
+                              trabajador.salario_base,
+                              trabajador.moneda
+                            )}
+                          </td>
+
+                          <td>
+                            <button
+                              onClick={() =>
+                                abrirEditar(trabajador)
+                              }
+                              className="btn-editar"
+                            >
+                              Editar / Ficha
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="personal-mobile">
+                {trabajadores.map((trabajador) => (
+                  <div
+                    key={trabajador.id}
+                    className="trabajador-card"
+                  >
+                    <div className="trabajador-card-top">
+                      <div className="trabajador-identidad">
+                        <div className="avatar avatar-mobile">
+                          {trabajador.nombre
+                            ?.charAt(0)
+                            .toUpperCase()}
+                        </div>
+
+                        <div>
                           <strong>
                             {nombreCompleto(trabajador)}
                           </strong>
+                          <span>{trabajador.cargo || "Sin cargo"}</span>
                         </div>
-                      </td>
+                      </div>
 
-                      <td style={estilos.td}>
-                        {trabajador.documento || "—"}
-                      </td>
+                      <span
+                        className={`estado ${
+                          trabajador.estado === "activo"
+                            ? "estado-activo"
+                            : trabajador.estado === "retirado"
+                            ? "estado-retirado"
+                            : "estado-temporal"
+                        }`}
+                      >
+                        {etiquetaEstado(trabajador.estado)}
+                      </span>
+                    </div>
 
-                      <td style={estilos.td}>
-                        {trabajador.cargo || "—"}
-                      </td>
+                    <div className="trabajador-datos">
+                      <div>
+                        <span>Documento</span>
+                        <strong>
+                          {trabajador.documento || "—"}
+                        </strong>
+                      </div>
 
-                      <td style={estilos.td}>
-                        {trabajador.telefono || "—"}
-                      </td>
+                      <div>
+                        <span>Teléfono</span>
+                        <strong>
+                          {trabajador.telefono || "—"}
+                        </strong>
+                      </div>
 
-                      <td style={estilos.td}>
-                        {mostrarFecha(
-                          trabajador.fecha_ingreso
-                        )}
-                      </td>
+                      <div>
+                        <span>Ingreso</span>
+                        <strong>
+                          {mostrarFecha(trabajador.fecha_ingreso)}
+                        </strong>
+                      </div>
 
-                      <td style={estilos.td}>
-                        <span
-                          style={{
-                            ...estilos.estado,
-                            ...(trabajador.estado === "activo"
-                              ? estilos.estadoActivo
-                              : trabajador.estado ===
-                                "retirado"
-                              ? estilos.estadoRetirado
-                              : estilos.estadoTemporal),
-                          }}
-                        >
-                          {etiquetaEstado(
-                            trabajador.estado
-                          )}
-                        </span>
-                      </td>
+                      <div>
+                        <span>Tipo de pago</span>
+                        <strong>
+                          {etiquetaPago(trabajador.tipo_pago)}
+                        </strong>
+                      </div>
+                    </div>
 
-                      <td style={estilos.td}>
-                        {etiquetaPago(
-                          trabajador.tipo_pago
-                        )}
-                      </td>
-
-                      <td style={estilos.td}>
+                    <div className="salario-mobile">
+                      <span>Salario</span>
+                      <strong>
                         {mostrarDinero(
                           trabajador.salario_base,
                           trabajador.moneda
                         )}
-                      </td>
+                      </strong>
+                    </div>
 
-                      <td style={estilos.td}>
-                        <button
-                          onClick={() =>
-                            abrirEditar(trabajador)
-                          }
-                          style={estilos.botonEditar}
-                        >
-                          Editar / Ficha
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                    <button
+                      onClick={() => abrirEditar(trabajador)}
+                      className="btn-editar btn-editar-mobile"
+                    >
+                      Editar / Ficha
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </section>
       </main>
+            <style jsx global>{`
+        * {
+          box-sizing: border-box;
+        }
+
+        body {
+          margin: 0;
+          background: #f5f8f5;
+        }
+
+        .personal-main {
+          margin-left: 235px;
+          min-height: 100vh;
+          background: #f5f8f5;
+          padding: 32px;
+          color: #173d29;
+          overflow-x: hidden;
+        }
+
+        .cargando {
+          padding: 40px;
+          font-size: 15px;
+        }
+
+        .encabezado {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 20px;
+          margin-bottom: 24px;
+        }
+
+        .encabezado h1 {
+          margin: 0;
+          font-size: 28px;
+          font-weight: 800;
+          color: #174c2e;
+        }
+
+        .encabezado p {
+          margin: 6px 0 0;
+          color: #708077;
+          font-size: 14px;
+        }
+
+        .alerta {
+          padding: 12px 14px;
+          border-radius: 9px;
+          margin-bottom: 18px;
+          font-size: 13px;
+        }
+
+        .alerta.error {
+          background: #fdecec;
+          color: #b42318;
+        }
+
+        .alerta.exito {
+          background: #eaf7ee;
+          color: #176b3a;
+        }
+
+        .resumen {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 18px;
+          margin-bottom: 22px;
+        }
+
+        .tarjeta-resumen {
+          background: white;
+          border: 1px solid #dce5df;
+          border-radius: 14px;
+          padding: 20px;
+          display: flex;
+          flex-direction: column;
+          gap: 7px;
+          min-width: 0;
+        }
+
+        .tarjeta-resumen > span {
+          font-size: 13px;
+          font-weight: 700;
+          color: #66786d;
+        }
+
+        .tarjeta-resumen > strong {
+          font-size: 27px;
+          color: #16713c;
+        }
+
+        .tarjeta-resumen > small {
+          font-size: 12px;
+          color: #8a9890;
+        }
+
+        .panel {
+          background: white;
+          border: 1px solid #dce5df;
+          border-radius: 14px;
+          margin-bottom: 22px;
+          overflow: hidden;
+          min-width: 0;
+        }
+
+        .panel-header {
+          padding: 20px 22px;
+          border-bottom: 1px solid #e6ece8;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 15px;
+        }
+
+        .panel-header h2 {
+          margin: 0;
+          font-size: 17px;
+          color: #174c2e;
+        }
+
+        .panel-header p {
+          margin: 5px 0 0;
+          font-size: 12px;
+          color: #8a9890;
+        }
+
+        .form-grid {
+          padding: 22px 22px 0;
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 18px;
+        }
+
+        .campo {
+          display: flex;
+          flex-direction: column;
+          gap: 7px;
+          min-width: 0;
+        }
+
+        .campo label,
+        .campo-completo label {
+          font-size: 12px;
+          font-weight: 700;
+          color: #425a4b;
+        }
+
+        .campo input,
+        .campo select {
+          width: 100%;
+          height: 42px;
+          border: 1px solid #d3ddd6;
+          border-radius: 8px;
+          padding: 0 11px;
+          background: white;
+          font-size: 13px;
+          color: #1d2c23;
+          outline: none;
+          min-width: 0;
+        }
+
+        .campo input:focus,
+        .campo select:focus,
+        .campo-completo textarea:focus {
+          border-color: #6da982;
+          box-shadow: 0 0 0 2px rgba(23, 107, 58, 0.08);
+        }
+
+        .campo .archivo-input {
+          height: auto;
+          min-height: 42px;
+          padding: 8px;
+          font-size: 12px;
+        }
+
+        .campo-completo {
+          padding: 18px 22px 0;
+          display: flex;
+          flex-direction: column;
+          gap: 7px;
+        }
+
+        .campo-completo textarea {
+          width: 100%;
+          min-height: 85px;
+          resize: vertical;
+          border: 1px solid #d3ddd6;
+          border-radius: 8px;
+          padding: 11px;
+          font-family: inherit;
+          font-size: 13px;
+          outline: none;
+        }
+
+        .acciones-form {
+          display: flex;
+          justify-content: flex-end;
+          gap: 10px;
+          padding: 20px 22px;
+        }
+
+        .btn-principal {
+          border: none;
+          border-radius: 9px;
+          background: #176b3a;
+          color: white;
+          padding: 11px 17px;
+          font-weight: 700;
+          font-size: 13px;
+          cursor: pointer;
+          font-family: inherit;
+        }
+
+        .btn-principal:disabled {
+          opacity: 0.6;
+          cursor: default;
+        }
+
+        .btn-secundario {
+          border: 1px solid #d4ddd7;
+          border-radius: 9px;
+          background: white;
+          color: #53665a;
+          padding: 10px 16px;
+          font-weight: 600;
+          font-size: 13px;
+          cursor: pointer;
+          font-family: inherit;
+        }
+
+        .documentos-form {
+          padding: 22px 22px 10px;
+          display: grid;
+          grid-template-columns:
+            minmax(180px, 0.8fr)
+            minmax(220px, 1.3fr)
+            minmax(180px, 1fr)
+            auto;
+          gap: 15px;
+          align-items: end;
+        }
+
+        .subir-contenedor {
+          display: flex;
+          align-items: flex-end;
+        }
+
+        .nota-archivo {
+          padding: 0 22px 18px;
+          font-size: 11px;
+          color: #8a9890;
+        }
+
+        .privado {
+          background: #edf6f0;
+          color: #176b3a;
+          padding: 7px 10px;
+          border-radius: 8px;
+          font-size: 11px;
+          font-weight: 700;
+          white-space: nowrap;
+        }
+
+        .tabla-wrap {
+          width: 100%;
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+        }
+
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 12px;
+        }
+
+        th {
+          text-align: left;
+          padding: 13px 14px;
+          background: #f7faf8;
+          color: #607267;
+          font-weight: 700;
+          border-bottom: 1px solid #e4ebe6;
+          white-space: nowrap;
+        }
+
+        td {
+          padding: 14px;
+          border-bottom: 1px solid #edf1ee;
+          color: #35483b;
+          vertical-align: middle;
+          white-space: nowrap;
+        }
+
+        .trabajador-celda {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .avatar {
+          width: 34px;
+          height: 34px;
+          min-width: 34px;
+          border-radius: 50%;
+          background: #e7f3eb;
+          color: #176b3a;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 800;
+        }
+
+        .estado {
+          display: inline-block;
+          padding: 5px 9px;
+          border-radius: 999px;
+          font-size: 11px;
+          font-weight: 700;
+          white-space: nowrap;
+        }
+
+        .estado-activo {
+          background: #e6f5eb;
+          color: #16713c;
+        }
+
+        .estado-temporal {
+          background: #fff4d8;
+          color: #8a6212;
+        }
+
+        .estado-retirado {
+          background: #f0f1f0;
+          color: #68736c;
+        }
+
+        .btn-editar {
+          border: 1px solid #cddbd2;
+          background: white;
+          color: #176b3a;
+          border-radius: 7px;
+          padding: 7px 11px;
+          font-weight: 700;
+          font-size: 11px;
+          cursor: pointer;
+          font-family: inherit;
+        }
+
+        .acciones-archivo {
+          display: flex;
+          gap: 7px;
+        }
+
+        .btn-ver {
+          border: 1px solid #bfd6c7;
+          background: #edf7f0;
+          color: #176b3a;
+          border-radius: 7px;
+          padding: 6px 10px;
+          font-weight: 700;
+          font-size: 11px;
+          cursor: pointer;
+          font-family: inherit;
+        }
+
+        .btn-eliminar {
+          border: 1px solid #f0caca;
+          background: #fff5f5;
+          color: #b42318;
+          border-radius: 7px;
+          padding: 6px 10px;
+          font-weight: 700;
+          font-size: 11px;
+          cursor: pointer;
+          font-family: inherit;
+        }
+
+        .vacio,
+        .vacio-documentos {
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+          gap: 8px;
+          color: #819087;
+          font-size: 13px;
+          text-align: center;
+          padding: 25px;
+        }
+
+        .vacio {
+          min-height: 240px;
+        }
+
+        .vacio-documentos {
+          min-height: 150px;
+          border-top: 1px solid #edf1ee;
+          font-size: 12px;
+        }
+
+        .vacio-icono {
+          font-size: 30px;
+        }
+
+        .personal-mobile,
+        .documentos-mobile {
+          display: none;
+        }
+
+        /* ===========================
+           TABLET
+        =========================== */
+
+        @media (max-width: 1100px) and (min-width: 821px) {
+          .personal-main {
+            padding: 24px;
+          }
+
+          .form-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+
+          .documentos-form {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+
+          .subir-contenedor .btn-principal {
+            width: 100%;
+          }
+        }
+
+        /* ===========================
+           CELULAR
+        =========================== */
+
+        @media (max-width: 820px) {
+          html,
+          body {
+            width: 100%;
+            max-width: 100%;
+            overflow-x: hidden;
+          }
+
+          .personal-main {
+            margin-left: 0;
+            width: 100%;
+            max-width: 100%;
+            min-height: 100vh;
+            padding: 84px 14px 28px;
+            overflow-x: hidden;
+          }
+
+          .cargando {
+            padding: 25px 4px;
+          }
+
+          .encabezado {
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 14px;
+            margin-bottom: 18px;
+          }
+
+          .encabezado h1 {
+            font-size: 25px;
+          }
+
+          .encabezado p {
+            font-size: 13px;
+          }
+
+          .encabezado .btn-principal,
+          .encabezado .btn-secundario {
+            width: 100%;
+            min-height: 44px;
+          }
+
+          .resumen {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+            margin-bottom: 16px;
+          }
+
+          .tarjeta-resumen {
+            padding: 13px 10px;
+            border-radius: 12px;
+            gap: 5px;
+          }
+
+          .tarjeta-resumen > span {
+            font-size: 10px;
+            line-height: 1.25;
+          }
+
+          .tarjeta-resumen > strong {
+            font-size: 23px;
+          }
+
+          .tarjeta-resumen > small {
+            display: none;
+          }
+
+          .panel {
+            border-radius: 12px;
+            margin-bottom: 16px;
+          }
+
+          .panel-header {
+            padding: 16px;
+            align-items: flex-start;
+          }
+
+          .panel-header h2 {
+            font-size: 16px;
+          }
+
+          .panel-header p {
+            font-size: 11px;
+            line-height: 1.45;
+          }
+
+          .documentos-header {
+            flex-direction: column;
+          }
+
+          .privado {
+            align-self: flex-start;
+          }
+
+          .form-grid {
+            padding: 16px 16px 0;
+            grid-template-columns: 1fr;
+            gap: 14px;
+          }
+
+          .campo-completo {
+            padding: 14px 16px 0;
+          }
+
+          .campo input,
+          .campo select {
+            height: 46px;
+            font-size: 16px;
+          }
+
+          .campo .archivo-input {
+            min-height: 46px;
+            height: auto;
+            font-size: 13px;
+          }
+
+          .campo-completo textarea {
+            min-height: 100px;
+            font-size: 16px;
+          }
+
+          .acciones-form {
+            padding: 18px 16px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 9px;
+          }
+
+          .acciones-form button {
+            min-height: 44px;
+            padding-left: 8px;
+            padding-right: 8px;
+          }
+
+          .documentos-form {
+            padding: 16px 16px 10px;
+            grid-template-columns: 1fr;
+            gap: 14px;
+          }
+
+          .subir-contenedor {
+            width: 100%;
+          }
+
+          .subir-contenedor .btn-principal {
+            width: 100%;
+            min-height: 44px;
+          }
+
+          .nota-archivo {
+            padding: 0 16px 16px;
+            line-height: 1.5;
+          }
+
+          /* En celular reemplazamos tablas por tarjetas */
+
+          .personal-desktop,
+          .documentos-desktop {
+            display: none;
+          }
+
+          .personal-mobile,
+          .documentos-mobile {
+            display: block;
+          }
+
+          .personal-mobile {
+            padding: 12px;
+          }
+
+          .trabajador-card {
+            background: #ffffff;
+            border: 1px solid #e0e8e2;
+            border-radius: 12px;
+            padding: 14px;
+            margin-bottom: 10px;
+            min-width: 0;
+          }
+
+          .trabajador-card:last-child {
+            margin-bottom: 0;
+          }
+
+          .trabajador-card-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 10px;
+            padding-bottom: 13px;
+            border-bottom: 1px solid #edf1ee;
+          }
+
+          .trabajador-identidad {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+          }
+
+          .trabajador-identidad > div:last-child {
+            min-width: 0;
+          }
+
+          .trabajador-identidad strong {
+            display: block;
+            color: #173d29;
+            font-size: 14px;
+            overflow-wrap: anywhere;
+          }
+
+          .trabajador-identidad span {
+            display: block;
+            color: #849188;
+            font-size: 11px;
+            margin-top: 3px;
+            overflow-wrap: anywhere;
+          }
+
+          .avatar-mobile {
+            width: 40px;
+            height: 40px;
+            min-width: 40px;
+            font-size: 15px;
+          }
+
+          .trabajador-datos {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 13px 10px;
+            padding: 14px 0;
+          }
+
+          .trabajador-datos > div {
+            min-width: 0;
+          }
+
+          .trabajador-datos span,
+          .salario-mobile span {
+            display: block;
+            color: #8a9890;
+            font-size: 10px;
+            margin-bottom: 4px;
+          }
+
+          .trabajador-datos strong {
+            display: block;
+            color: #35483b;
+            font-size: 12px;
+            overflow-wrap: anywhere;
+          }
+
+          .salario-mobile {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            background: #f6faf7;
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin-bottom: 12px;
+          }
+
+          .salario-mobile span {
+            margin: 0;
+          }
+
+          .salario-mobile strong {
+            color: #176b3a;
+            font-size: 13px;
+          }
+
+          .btn-editar-mobile {
+            width: 100%;
+            min-height: 42px;
+            font-size: 12px;
+          }
+
+          .documentos-mobile {
+            padding: 12px;
+            border-top: 1px solid #edf1ee;
+          }
+
+          .documento-card {
+            border: 1px solid #e0e8e2;
+            border-radius: 11px;
+            padding: 13px;
+            margin-bottom: 10px;
+            min-width: 0;
+          }
+
+          .documento-card:last-child {
+            margin-bottom: 0;
+          }
+
+          .documento-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 10px;
+          }
+
+          .documento-top > div {
+            min-width: 0;
+          }
+
+          .documento-top strong {
+            display: block;
+            color: #174c2e;
+            font-size: 12px;
+          }
+
+          .documento-top span:not(.documento-tamano) {
+            display: block;
+            margin-top: 4px;
+            color: #66786d;
+            font-size: 11px;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+          }
+
+          .documento-tamano {
+            background: #f3f6f4;
+            border-radius: 7px;
+            padding: 5px 7px;
+            color: #66786d;
+            font-size: 10px;
+            white-space: nowrap;
+          }
+
+          .documento-card p {
+            margin: 10px 0 5px;
+            color: #53665a;
+            font-size: 11px;
+            overflow-wrap: anywhere;
+          }
+
+          .documento-card small {
+            color: #929e96;
+            font-size: 10px;
+          }
+
+          .documento-botones {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 12px;
+          }
+
+          .documento-botones button {
+            min-height: 40px;
+          }
+        }
+
+        @media (max-width: 380px) {
+          .personal-main {
+            padding-left: 10px;
+            padding-right: 10px;
+          }
+
+          .resumen {
+            gap: 6px;
+          }
+
+          .tarjeta-resumen {
+            padding: 12px 7px;
+          }
+
+          .tarjeta-resumen > span {
+            font-size: 9px;
+          }
+
+          .tarjeta-resumen > strong {
+            font-size: 21px;
+          }
+        }
+      `}</style>
     </>
   );
 }
@@ -1210,381 +2010,9 @@ function Campo({
   children: React.ReactNode;
 }) {
   return (
-    <div style={estilos.campo}>
-      <label style={estilos.label}>{label}</label>
+    <div className="campo">
+      <label>{label}</label>
       {children}
     </div>
   );
 }
-
-const estilos: Record<string, React.CSSProperties> = {
-  main: {
-    marginLeft: "235px",
-    minHeight: "100vh",
-    background: "#f5f8f5",
-    padding: "32px",
-    boxSizing: "border-box",
-    color: "#173d29",
-  },
-
-  cargando: {
-    padding: "40px",
-    fontSize: "15px",
-  },
-
-  encabezado: {
-    display: "flex",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: "20px",
-    marginBottom: "24px",
-  },
-
-  titulo: {
-    margin: 0,
-    fontSize: "28px",
-    fontWeight: 800,
-    color: "#174c2e",
-  },
-
-  subtitulo: {
-    margin: "6px 0 0",
-    color: "#708077",
-    fontSize: "14px",
-  },
-
-  alertaError: {
-    padding: "12px 14px",
-    background: "#fdecec",
-    color: "#b42318",
-    borderRadius: "9px",
-    marginBottom: "18px",
-    fontSize: "13px",
-  },
-
-  alertaExito: {
-    padding: "12px 14px",
-    background: "#eaf7ee",
-    color: "#176b3a",
-    borderRadius: "9px",
-    marginBottom: "18px",
-    fontSize: "13px",
-  },
-
-  tarjetas: {
-    display: "grid",
-    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-    gap: "18px",
-    marginBottom: "22px",
-  },
-
-  tarjeta: {
-    background: "white",
-    border: "1px solid #dce5df",
-    borderRadius: "14px",
-    padding: "20px",
-    display: "flex",
-    flexDirection: "column",
-    gap: "7px",
-  },
-
-  tarjetaLabel: {
-    fontSize: "13px",
-    fontWeight: 700,
-    color: "#66786d",
-  },
-
-  tarjetaNumero: {
-    fontSize: "27px",
-    color: "#16713c",
-  },
-
-  tarjetaTexto: {
-    fontSize: "12px",
-    color: "#8a9890",
-  },
-
-  panel: {
-    background: "white",
-    border: "1px solid #dce5df",
-    borderRadius: "14px",
-    marginBottom: "22px",
-    overflow: "hidden",
-  },
-
-  panelTituloContenedor: {
-    padding: "20px 22px",
-    borderBottom: "1px solid #e6ece8",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: "15px",
-  },
-
-  panelTitulo: {
-    margin: 0,
-    fontSize: "17px",
-    color: "#174c2e",
-  },
-
-  panelSubtitulo: {
-    margin: "5px 0 0",
-    fontSize: "12px",
-    color: "#8a9890",
-  },
-
-  formGrid: {
-    padding: "22px 22px 0",
-    display: "grid",
-    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-    gap: "18px",
-  },
-
-  campo: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "7px",
-  },
-
-  campoCompleto: {
-    padding: "18px 22px 0",
-    display: "flex",
-    flexDirection: "column",
-    gap: "7px",
-  },
-
-  label: {
-    fontSize: "12px",
-    fontWeight: 700,
-    color: "#425a4b",
-  },
-
-  input: {
-    width: "100%",
-    height: "42px",
-    border: "1px solid #d3ddd6",
-    borderRadius: "8px",
-    padding: "0 11px",
-    boxSizing: "border-box",
-    background: "white",
-    fontSize: "13px",
-    color: "#1d2c23",
-    outline: "none",
-  },
-
-  inputArchivo: {
-    width: "100%",
-    minHeight: "42px",
-    border: "1px solid #d3ddd6",
-    borderRadius: "8px",
-    padding: "8px",
-    boxSizing: "border-box",
-    background: "white",
-    fontSize: "12px",
-  },
-
-  textarea: {
-    width: "100%",
-    minHeight: "85px",
-    resize: "vertical",
-    border: "1px solid #d3ddd6",
-    borderRadius: "8px",
-    padding: "11px",
-    boxSizing: "border-box",
-    fontFamily: "inherit",
-    fontSize: "13px",
-    outline: "none",
-  },
-
-  accionesFormulario: {
-    display: "flex",
-    justifyContent: "flex-end",
-    gap: "10px",
-    padding: "20px 22px",
-  },
-
-  botonPrincipal: {
-    border: "none",
-    borderRadius: "9px",
-    background: "#176b3a",
-    color: "white",
-    padding: "11px 17px",
-    fontWeight: 700,
-    fontSize: "13px",
-    cursor: "pointer",
-  },
-
-  botonSecundario: {
-    border: "1px solid #d4ddd7",
-    borderRadius: "9px",
-    background: "white",
-    color: "#53665a",
-    padding: "10px 16px",
-    fontWeight: 600,
-    fontSize: "13px",
-    cursor: "pointer",
-  },
-
-  documentosFormulario: {
-    padding: "22px 22px 10px",
-    display: "grid",
-    gridTemplateColumns:
-      "minmax(180px, 0.8fr) minmax(260px, 1.3fr) minmax(220px, 1fr) auto",
-    gap: "15px",
-    alignItems: "end",
-  },
-
-  subirContenedor: {
-    display: "flex",
-    alignItems: "flex-end",
-  },
-
-  notaArchivo: {
-    padding: "0 22px 18px",
-    fontSize: "11px",
-    color: "#8a9890",
-  },
-
-  privado: {
-    background: "#edf6f0",
-    color: "#176b3a",
-    padding: "7px 10px",
-    borderRadius: "8px",
-    fontSize: "11px",
-    fontWeight: 700,
-  },
-
-  tablaContenedor: {
-    overflowX: "auto",
-  },
-
-  tabla: {
-    width: "100%",
-    borderCollapse: "collapse",
-    fontSize: "12px",
-  },
-
-  th: {
-    textAlign: "left",
-    padding: "13px 14px",
-    background: "#f7faf8",
-    color: "#607267",
-    fontWeight: 700,
-    borderBottom: "1px solid #e4ebe6",
-    whiteSpace: "nowrap",
-  },
-
-  td: {
-    padding: "14px",
-    borderBottom: "1px solid #edf1ee",
-    color: "#35483b",
-    verticalAlign: "middle",
-    whiteSpace: "nowrap",
-  },
-
-  trabajadorCelda: {
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-  },
-
-  avatar: {
-    width: "34px",
-    height: "34px",
-    borderRadius: "50%",
-    background: "#e7f3eb",
-    color: "#176b3a",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontWeight: 800,
-  },
-
-  estado: {
-    display: "inline-block",
-    padding: "5px 9px",
-    borderRadius: "999px",
-    fontSize: "11px",
-    fontWeight: 700,
-  },
-
-  estadoActivo: {
-    background: "#e6f5eb",
-    color: "#16713c",
-  },
-
-  estadoTemporal: {
-    background: "#fff4d8",
-    color: "#8a6212",
-  },
-
-  estadoRetirado: {
-    background: "#f0f1f0",
-    color: "#68736c",
-  },
-
-  botonEditar: {
-    border: "1px solid #cddbd2",
-    background: "white",
-    color: "#176b3a",
-    borderRadius: "7px",
-    padding: "7px 11px",
-    fontWeight: 700,
-    fontSize: "11px",
-    cursor: "pointer",
-  },
-
-  accionesArchivo: {
-    display: "flex",
-    gap: "7px",
-  },
-
-  botonVer: {
-    border: "1px solid #bfd6c7",
-    background: "#edf7f0",
-    color: "#176b3a",
-    borderRadius: "7px",
-    padding: "6px 10px",
-    fontWeight: 700,
-    fontSize: "11px",
-    cursor: "pointer",
-  },
-
-  botonEliminar: {
-    border: "1px solid #f0caca",
-    background: "#fff5f5",
-    color: "#b42318",
-    borderRadius: "7px",
-    padding: "6px 10px",
-    fontWeight: 700,
-    fontSize: "11px",
-    cursor: "pointer",
-  },
-
-  vacio: {
-    minHeight: "240px",
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: "8px",
-    color: "#819087",
-    fontSize: "13px",
-  },
-
-  vacioDocumentos: {
-    minHeight: "150px",
-    borderTop: "1px solid #edf1ee",
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: "7px",
-    color: "#819087",
-    fontSize: "12px",
-  },
-
-  vacioIcono: {
-    fontSize: "30px",
-  },
-};
