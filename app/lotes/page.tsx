@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
+import Sidebar from "../components/Sidebar";
 
 type Potrero = {
   id: string;
@@ -29,11 +30,13 @@ type Lote = {
 export default function LotesPage() {
   const [loading, setLoading] = useState(true);
   const [guardando, setGuardando] = useState(false);
-  const [mostrarFormulario, setMostrarFormulario] = useState(false);
+  const [mostrarFormulario, setMostrarFormulario] =
+    useState(false);
   const [mensaje, setMensaje] = useState("");
   const [fincaId, setFincaId] = useState("");
   const [lotes, setLotes] = useState<Lote[]>([]);
-  const [potreros, setPotreros] = useState<Potrero[]>([]);
+  const [potreros, setPotreros] =
+    useState<Potrero[]>([]);
 
   const [form, setForm] = useState({
     nombre: "",
@@ -43,7 +46,8 @@ export default function LotesPage() {
     cantidad_machos: "",
     cantidad_hembras: "",
     peso_promedio: "",
-    fecha_ingreso: new Date().toISOString().split("T")[0],
+    fecha_ingreso:
+      new Date().toISOString().split("T")[0],
     origen: "",
     potrero_id: "",
     observaciones: "",
@@ -65,7 +69,10 @@ export default function LotesPage() {
       return;
     }
 
-    const { data: usuario, error: errorUsuario } = await supabase
+    const {
+      data: usuario,
+      error: errorUsuario,
+    } = await supabase
       .from("gan_usuarios")
       .select("finca_id, nombre, rol")
       .eq("user_id", user.id)
@@ -88,7 +95,9 @@ export default function LotesPage() {
     setLoading(false);
   };
 
-  const cargarLotes = async (idFinca: string) => {
+  const cargarLotes = async (
+    idFinca: string
+  ) => {
     const { data, error } = await supabase
       .from("gan_lotes_ganado")
       .select(`
@@ -109,18 +118,26 @@ export default function LotesPage() {
         )
       `)
       .eq("finca_id", idFinca)
-      .order("created_at", { ascending: false });
+      .order("created_at", {
+        ascending: false,
+      });
 
     if (error) {
       console.error(error);
-      setMensaje(`Error al cargar lotes: ${error.message}`);
+      setMensaje(
+        `Error al cargar lotes: ${error.message}`
+      );
       return;
     }
 
-    setLotes((data || []) as unknown as Lote[]);
+    setLotes(
+      (data || []) as unknown as Lote[]
+    );
   };
 
-  const cargarPotreros = async (idFinca: string) => {
+  const cargarPotreros = async (
+    idFinca: string
+  ) => {
     const { data, error } = await supabase
       .from("gan_potreros")
       .select("id, nombre")
@@ -145,21 +162,35 @@ export default function LotesPage() {
     }));
   };
 
-  const guardarLote = async (e: React.FormEvent) => {
+  const guardarLote = async (
+    e: React.FormEvent
+  ) => {
     e.preventDefault();
     setMensaje("");
 
-    const total = Number(form.cantidad_total || 0);
-    const machos = Number(form.cantidad_machos || 0);
-    const hembras = Number(form.cantidad_hembras || 0);
+    const total = Number(
+      form.cantidad_total || 0
+    );
+
+    const machos = Number(
+      form.cantidad_machos || 0
+    );
+
+    const hembras = Number(
+      form.cantidad_hembras || 0
+    );
 
     if (!form.nombre.trim()) {
-      setMensaje("Debes colocar un nombre al lote.");
+      setMensaje(
+        "Debes colocar un nombre al lote."
+      );
       return;
     }
 
     if (total <= 0) {
-      setMensaje("La cantidad total debe ser mayor a cero.");
+      setMensaje(
+        "La cantidad total debe ser mayor a cero."
+      );
       return;
     }
 
@@ -181,42 +212,61 @@ export default function LotesPage() {
       return;
     }
 
-    const { data: loteCreado, error } = await supabase
+    const {
+      data: loteCreado,
+      error,
+    } = await supabase
       .from("gan_lotes_ganado")
       .insert({
         finca_id: fincaId,
         nombre: form.nombre.trim(),
-        categoria: form.categoria || null,
+        categoria:
+          form.categoria || null,
         raza: form.raza || null,
         cantidad_total: total,
         cantidad_machos: machos,
         cantidad_hembras: hembras,
-        peso_promedio: form.peso_promedio
-          ? Number(form.peso_promedio)
-          : null,
-        fecha_ingreso: form.fecha_ingreso || null,
+        peso_promedio:
+          form.peso_promedio
+            ? Number(
+                form.peso_promedio
+              )
+            : null,
+        fecha_ingreso:
+          form.fecha_ingreso || null,
         origen: form.origen || null,
-        potrero_id: form.potrero_id || null,
+        potrero_id:
+          form.potrero_id || null,
         estado: "activo",
-        observaciones: form.observaciones || null,
+        observaciones:
+          form.observaciones || null,
       })
       .select("id")
       .single();
 
     if (error) {
-      setMensaje(`Error al guardar: ${error.message}`);
+      setMensaje(
+        `Error al guardar: ${error.message}`
+      );
       setGuardando(false);
       return;
     }
 
-    await supabase.from("gan_lote_eventos").insert({
-      lote_id: loteCreado.id,
-      fecha: form.fecha_ingreso || new Date().toISOString().split("T")[0],
-      tipo: "creacion",
-      cantidad: total,
-      descripcion: "Creación inicial del lote",
-      registrado_por: user.id,
-    });
+    await supabase
+      .from("gan_lote_eventos")
+      .insert({
+        lote_id: loteCreado.id,
+        fecha:
+          form.fecha_ingreso ||
+          new Date()
+            .toISOString()
+            .split("T")[0],
+        tipo: "creacion",
+        cantidad: total,
+        descripcion:
+          "Creación inicial del lote",
+        registrado_por: user.id,
+      });
 
     setForm({
       nombre: "",
@@ -226,21 +276,40 @@ export default function LotesPage() {
       cantidad_machos: "",
       cantidad_hembras: "",
       peso_promedio: "",
-      fecha_ingreso: new Date().toISOString().split("T")[0],
+      fecha_ingreso:
+        new Date()
+          .toISOString()
+          .split("T")[0],
       origen: "",
       potrero_id: "",
       observaciones: "",
     });
 
     setMostrarFormulario(false);
-    setMensaje("Lote registrado correctamente.");
+
+    setMensaje(
+      "Lote registrado correctamente."
+    );
+
     await cargarLotes(fincaId);
+
     setGuardando(false);
   };
 
   const totalGanado = lotes
-    .filter((lote) => lote.estado === "activo" || lote.estado === "feedlot")
-    .reduce((suma, lote) => suma + Number(lote.cantidad_total || 0), 0);
+    .filter(
+      (lote) =>
+        lote.estado === "activo" ||
+        lote.estado === "feedlot"
+    )
+    .reduce(
+      (suma, lote) =>
+        suma +
+        Number(
+          lote.cantidad_total || 0
+        ),
+      0
+    );
 
   if (loading) {
     return (
@@ -252,48 +321,36 @@ export default function LotesPage() {
 
   return (
     <main style={estilos.pagina}>
-      <aside style={estilos.sidebar}>
-        <div style={estilos.logo}>
-          <div style={estilos.logoIcono}>🐂</div>
-          <div>
-            <strong>Ganadería</strong>
-            <br />
-            <strong>Tavera</strong>
-          </div>
-        </div>
-
-        <MenuItem texto="Dashboard" icono="▦" ruta="/dashboard" />
-        <MenuItem texto="Ganado" icono="🐄" />
-        <MenuItem texto="Lotes" icono="▣" activo />
-        <MenuItem texto="Potreros" icono="🌱" />
-        <MenuItem texto="Nacimientos" icono="🐮" />
-        <MenuItem texto="Pesajes" icono="⚖" />
-        <MenuItem texto="Movimientos" icono="↔" />
-        <MenuItem texto="Sanidad" icono="♥" />
-        <MenuItem texto="Feedlot" icono="🌾" />
-        <MenuItem texto="Maquinaria" icono="🚜" />
-        <MenuItem texto="Personal" icono="👥" />
-        <MenuItem texto="Gastos" icono="$" />
-        <MenuItem texto="Reportes" icono="▤" />
-      </aside>
+      <Sidebar />
 
       <section style={estilos.contenido}>
         <header style={estilos.header}>
           <div>
-            <h1 style={estilos.titulo}>Lotes de ganado</h1>
+            <h1 style={estilos.titulo}>
+              Lotes de ganado
+            </h1>
+
             <p style={estilos.subtitulo}>
-              Administración de grupos y existencias de ganado
+              Administración de grupos y
+              existencias de ganado
             </p>
           </div>
 
           <button
-            style={estilos.botonPrincipal}
+            style={
+              estilos.botonPrincipal
+            }
             onClick={() => {
               setMensaje("");
-              setMostrarFormulario(!mostrarFormulario);
+
+              setMostrarFormulario(
+                !mostrarFormulario
+              );
             }}
           >
-            {mostrarFormulario ? "Cancelar" : "+ Nuevo lote"}
+            {mostrarFormulario
+              ? "Cancelar"
+              : "+ Nuevo lote"}
           </button>
         </header>
 
@@ -301,19 +358,27 @@ export default function LotesPage() {
           <div
             style={{
               ...estilos.mensaje,
-              background: mensaje.includes("correctamente")
-                ? "#edf8f0"
-                : "#fff1f1",
-              color: mensaje.includes("correctamente")
-                ? "#176b3a"
-                : "#b42318",
+              background:
+                mensaje.includes(
+                  "correctamente"
+                )
+                  ? "#edf8f0"
+                  : "#fff1f1",
+              color:
+                mensaje.includes(
+                  "correctamente"
+                )
+                  ? "#176b3a"
+                  : "#b42318",
             }}
           >
             {mensaje}
           </div>
         )}
 
-        <div style={estilos.resumenGrid}>
+        <div
+          style={estilos.resumenGrid}
+        >
           <Tarjeta
             titulo="Ganado total"
             valor={totalGanado.toLocaleString()}
@@ -325,8 +390,10 @@ export default function LotesPage() {
             valor={String(
               lotes.filter(
                 (lote) =>
-                  lote.estado === "activo" ||
-                  lote.estado === "feedlot"
+                  lote.estado ===
+                    "activo" ||
+                  lote.estado ===
+                    "feedlot"
               ).length
             )}
             detalle="Grupos registrados"
@@ -334,7 +401,9 @@ export default function LotesPage() {
 
           <Tarjeta
             titulo="Potreros disponibles"
-            valor={String(potreros.length)}
+            valor={String(
+              potreros.length
+            )}
             detalle="Potreros registrados"
           />
         </div>
@@ -344,110 +413,193 @@ export default function LotesPage() {
             onSubmit={guardarLote}
             style={estilos.formulario}
           >
-            <h2 style={estilos.formTitulo}>Registrar nuevo lote</h2>
+            <h2
+              style={
+                estilos.formTitulo
+              }
+            >
+              Registrar nuevo lote
+            </h2>
 
-            <div style={estilos.formGrid}>
+            <div
+              style={estilos.formGrid}
+            >
               <Campo
                 label="Nombre del lote *"
                 value={form.nombre}
-                onChange={(v) => actualizarCampo("nombre", v)}
+                onChange={(v) =>
+                  actualizarCampo(
+                    "nombre",
+                    v
+                  )
+                }
                 placeholder="Ej. Novillos Lote 1"
               />
 
               <Campo
                 label="Categoría"
                 value={form.categoria}
-                onChange={(v) => actualizarCampo("categoria", v)}
+                onChange={(v) =>
+                  actualizarCampo(
+                    "categoria",
+                    v
+                  )
+                }
                 placeholder="Ej. Novillos"
               />
 
               <Campo
                 label="Raza"
                 value={form.raza}
-                onChange={(v) => actualizarCampo("raza", v)}
+                onChange={(v) =>
+                  actualizarCampo(
+                    "raza",
+                    v
+                  )
+                }
                 placeholder="Ej. Nelore"
               />
 
               <Campo
                 label="Cantidad total *"
                 type="number"
-                value={form.cantidad_total}
+                value={
+                  form.cantidad_total
+                }
                 onChange={(v) =>
-                  actualizarCampo("cantidad_total", v)
+                  actualizarCampo(
+                    "cantidad_total",
+                    v
+                  )
                 }
               />
 
               <Campo
                 label="Machos"
                 type="number"
-                value={form.cantidad_machos}
+                value={
+                  form.cantidad_machos
+                }
                 onChange={(v) =>
-                  actualizarCampo("cantidad_machos", v)
+                  actualizarCampo(
+                    "cantidad_machos",
+                    v
+                  )
                 }
               />
 
               <Campo
                 label="Hembras"
                 type="number"
-                value={form.cantidad_hembras}
+                value={
+                  form.cantidad_hembras
+                }
                 onChange={(v) =>
-                  actualizarCampo("cantidad_hembras", v)
+                  actualizarCampo(
+                    "cantidad_hembras",
+                    v
+                  )
                 }
               />
 
               <Campo
                 label="Peso promedio (kg)"
                 type="number"
-                value={form.peso_promedio}
+                value={
+                  form.peso_promedio
+                }
                 onChange={(v) =>
-                  actualizarCampo("peso_promedio", v)
+                  actualizarCampo(
+                    "peso_promedio",
+                    v
+                  )
                 }
               />
 
               <Campo
                 label="Fecha de ingreso"
                 type="date"
-                value={form.fecha_ingreso}
+                value={
+                  form.fecha_ingreso
+                }
                 onChange={(v) =>
-                  actualizarCampo("fecha_ingreso", v)
+                  actualizarCampo(
+                    "fecha_ingreso",
+                    v
+                  )
                 }
               />
 
               <Campo
                 label="Origen"
                 value={form.origen}
-                onChange={(v) => actualizarCampo("origen", v)}
+                onChange={(v) =>
+                  actualizarCampo(
+                    "origen",
+                    v
+                  )
+                }
                 placeholder="Ej. Nacidos en finca"
               />
 
               <div>
-                <label style={estilos.label}>Potrero</label>
+                <label
+                  style={estilos.label}
+                >
+                  Potrero
+                </label>
+
                 <select
-                  value={form.potrero_id}
+                  value={
+                    form.potrero_id
+                  }
                   onChange={(e) =>
-                    actualizarCampo("potrero_id", e.target.value)
+                    actualizarCampo(
+                      "potrero_id",
+                      e.target.value
+                    )
                   }
                   style={estilos.input}
                 >
-                  <option value="">Sin asignar</option>
+                  <option value="">
+                    Sin asignar
+                  </option>
 
-                  {potreros.map((potrero) => (
-                    <option
-                      key={potrero.id}
-                      value={potrero.id}
-                    >
-                      {potrero.nombre}
-                    </option>
-                  ))}
+                  {potreros.map(
+                    (potrero) => (
+                      <option
+                        key={
+                          potrero.id
+                        }
+                        value={
+                          potrero.id
+                        }
+                      >
+                        {
+                          potrero.nombre
+                        }
+                      </option>
+                    )
+                  )}
                 </select>
               </div>
             </div>
 
-            <div style={{ marginTop: "18px" }}>
-              <label style={estilos.label}>Observaciones</label>
+            <div
+              style={{
+                marginTop: "18px",
+              }}
+            >
+              <label
+                style={estilos.label}
+              >
+                Observaciones
+              </label>
 
               <textarea
-                value={form.observaciones}
+                value={
+                  form.observaciones
+                }
                 onChange={(e) =>
                   actualizarCampo(
                     "observaciones",
@@ -463,11 +615,21 @@ export default function LotesPage() {
               />
             </div>
 
-            <div style={estilos.formBotones}>
+            <div
+              style={
+                estilos.formBotones
+              }
+            >
               <button
                 type="button"
-                style={estilos.botonSecundario}
-                onClick={() => setMostrarFormulario(false)}
+                style={
+                  estilos.botonSecundario
+                }
+                onClick={() =>
+                  setMostrarFormulario(
+                    false
+                  )
+                }
               >
                 Cancelar
               </button>
@@ -477,94 +639,228 @@ export default function LotesPage() {
                 disabled={guardando}
                 style={{
                   ...estilos.botonPrincipal,
-                  opacity: guardando ? 0.7 : 1,
+                  opacity: guardando
+                    ? 0.7
+                    : 1,
                 }}
               >
-                {guardando ? "Guardando..." : "Guardar lote"}
+                {guardando
+                  ? "Guardando..."
+                  : "Guardar lote"}
               </button>
             </div>
           </form>
         )}
 
-        <div style={estilos.tablaPanel}>
-          <div style={estilos.tablaHeader}>
+        <div
+          style={estilos.tablaPanel}
+        >
+          <div
+            style={estilos.tablaHeader}
+          >
             <div>
-              <h2 style={estilos.tablaTitulo}>
+              <h2
+                style={
+                  estilos.tablaTitulo
+                }
+              >
                 Lotes registrados
               </h2>
 
-              <span style={estilos.tablaSubtitulo}>
+              <span
+                style={
+                  estilos.tablaSubtitulo
+                }
+              >
                 {lotes.length} lote
-                {lotes.length === 1 ? "" : "s"}
+                {lotes.length === 1
+                  ? ""
+                  : "s"}
               </span>
             </div>
           </div>
 
           {lotes.length === 0 ? (
-            <div style={estilos.vacio}>
-              <div style={{ fontSize: "38px" }}>🐄</div>
-              <strong>No hay lotes registrados</strong>
+            <div
+              style={estilos.vacio}
+            >
+              <div
+                style={{
+                  fontSize: "38px",
+                }}
+              >
+                🐄
+              </div>
+
+              <strong>
+                No hay lotes registrados
+              </strong>
+
               <span>
-                Utiliza “Nuevo lote” para registrar el primero.
+                Utiliza “Nuevo lote” para
+                registrar el primero.
               </span>
             </div>
           ) : (
-            <div style={{ overflowX: "auto" }}>
-              <table style={estilos.tabla}>
+            <div
+              style={{
+                overflowX: "auto",
+              }}
+            >
+              <table
+                style={estilos.tabla}
+              >
                 <thead>
                   <tr>
-                    <th style={estilos.th}>Lote</th>
-                    <th style={estilos.th}>Categoría</th>
-                    <th style={estilos.th}>Raza</th>
-                    <th style={estilos.th}>Cantidad</th>
-                    <th style={estilos.th}>M / H</th>
-                    <th style={estilos.th}>Peso prom.</th>
-                    <th style={estilos.th}>Potrero</th>
-                    <th style={estilos.th}>Estado</th>
+                    <th
+                      style={estilos.th}
+                    >
+                      Lote
+                    </th>
+
+                    <th
+                      style={estilos.th}
+                    >
+                      Categoría
+                    </th>
+
+                    <th
+                      style={estilos.th}
+                    >
+                      Raza
+                    </th>
+
+                    <th
+                      style={estilos.th}
+                    >
+                      Cantidad
+                    </th>
+
+                    <th
+                      style={estilos.th}
+                    >
+                      M / H
+                    </th>
+
+                    <th
+                      style={estilos.th}
+                    >
+                      Peso prom.
+                    </th>
+
+                    <th
+                      style={estilos.th}
+                    >
+                      Potrero
+                    </th>
+
+                    <th
+                      style={estilos.th}
+                    >
+                      Estado
+                    </th>
                   </tr>
                 </thead>
 
                 <tbody>
-                  {lotes.map((lote) => (
-                    <tr key={lote.id}>
-                      <td style={estilos.td}>
-                        <strong>{lote.nombre}</strong>
-                      </td>
+                  {lotes.map(
+                    (lote) => (
+                      <tr
+                        key={lote.id}
+                      >
+                        <td
+                          style={
+                            estilos.td
+                          }
+                        >
+                          <strong>
+                            {
+                              lote.nombre
+                            }
+                          </strong>
+                        </td>
 
-                      <td style={estilos.td}>
-                        {lote.categoria || "—"}
-                      </td>
+                        <td
+                          style={
+                            estilos.td
+                          }
+                        >
+                          {lote.categoria ||
+                            "—"}
+                        </td>
 
-                      <td style={estilos.td}>
-                        {lote.raza || "—"}
-                      </td>
+                        <td
+                          style={
+                            estilos.td
+                          }
+                        >
+                          {lote.raza ||
+                            "—"}
+                        </td>
 
-                      <td style={estilos.td}>
-                        {lote.cantidad_total}
-                      </td>
+                        <td
+                          style={
+                            estilos.td
+                          }
+                        >
+                          {
+                            lote.cantidad_total
+                          }
+                        </td>
 
-                      <td style={estilos.td}>
-                        {lote.cantidad_machos} /{" "}
-                        {lote.cantidad_hembras}
-                      </td>
+                        <td
+                          style={
+                            estilos.td
+                          }
+                        >
+                          {
+                            lote.cantidad_machos
+                          }{" "}
+                          /{" "}
+                          {
+                            lote.cantidad_hembras
+                          }
+                        </td>
 
-                      <td style={estilos.td}>
-                        {lote.peso_promedio
-                          ? `${lote.peso_promedio} kg`
-                          : "—"}
-                      </td>
+                        <td
+                          style={
+                            estilos.td
+                          }
+                        >
+                          {lote.peso_promedio
+                            ? `${lote.peso_promedio} kg`
+                            : "—"}
+                        </td>
 
-                      <td style={estilos.td}>
-                        {lote.gan_potreros?.nombre || "Sin asignar"}
-                      </td>
+                        <td
+                          style={
+                            estilos.td
+                          }
+                        >
+                          {lote
+                            .gan_potreros
+                            ?.nombre ||
+                            "Sin asignar"}
+                        </td>
 
-                      <td style={estilos.td}>
-                        <span style={estilos.estado}>
-                          {lote.estado}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                        <td
+                          style={
+                            estilos.td
+                          }
+                        >
+                          <span
+                            style={
+                              estilos.estado
+                            }
+                          >
+                            {
+                              lote.estado
+                            }
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  )}
                 </tbody>
               </table>
             </div>
@@ -572,45 +868,6 @@ export default function LotesPage() {
         </div>
       </section>
     </main>
-  );
-}
-
-function MenuItem({
-  texto,
-  icono,
-  ruta,
-  activo = false,
-}: {
-  texto: string;
-  icono: string;
-  ruta?: string;
-  activo?: boolean;
-}) {
-  return (
-    <div
-      onClick={() => {
-        if (ruta) window.location.href = ruta;
-      }}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "12px",
-        padding: "11px 12px",
-        marginBottom: "5px",
-        borderRadius: "9px",
-        background: activo
-          ? "rgba(255,255,255,0.14)"
-          : "transparent",
-        cursor: ruta ? "pointer" : "default",
-        fontSize: "14px",
-        fontWeight: activo ? 700 : 500,
-      }}
-    >
-      <span style={{ width: "22px", textAlign: "center" }}>
-        {icono}
-      </span>
-      {texto}
-    </div>
   );
 }
 
@@ -629,14 +886,26 @@ function Campo({
 }) {
   return (
     <div>
-      <label style={estilos.label}>{label}</label>
+      <label style={estilos.label}>
+        {label}
+      </label>
 
       <input
         type={type}
         value={value}
-        min={type === "number" ? "0" : undefined}
-        step={type === "number" ? "any" : undefined}
-        onChange={(e) => onChange(e.target.value)}
+        min={
+          type === "number"
+            ? "0"
+            : undefined
+        }
+        step={
+          type === "number"
+            ? "any"
+            : undefined
+        }
+        onChange={(e) =>
+          onChange(e.target.value)
+        }
         placeholder={placeholder}
         style={estilos.input}
       />
@@ -655,14 +924,31 @@ function Tarjeta({
 }) {
   return (
     <div style={estilos.tarjeta}>
-      <span style={estilos.tarjetaTitulo}>{titulo}</span>
-      <strong style={estilos.tarjetaValor}>{valor}</strong>
-      <span style={estilos.tarjetaDetalle}>{detalle}</span>
+      <span
+        style={estilos.tarjetaTitulo}
+      >
+        {titulo}
+      </span>
+
+      <strong
+        style={estilos.tarjetaValor}
+      >
+        {valor}
+      </strong>
+
+      <span
+        style={estilos.tarjetaDetalle}
+      >
+        {detalle}
+      </span>
     </div>
   );
 }
 
-const estilos: Record<string, React.CSSProperties> = {
+const estilos: Record<
+  string,
+  React.CSSProperties
+> = {
   pagina: {
     minHeight: "100vh",
     background: "#f4f7f3",
@@ -679,38 +965,6 @@ const estilos: Record<string, React.CSSProperties> = {
     fontFamily: "Arial, sans-serif",
     color: "#176b3a",
     fontWeight: 700,
-  },
-
-  sidebar: {
-    position: "fixed",
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: "235px",
-    background: "#103f28",
-    color: "white",
-    padding: "26px 18px",
-    boxSizing: "border-box",
-    overflowY: "auto",
-  },
-
-  logo: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    marginBottom: "32px",
-    paddingLeft: "8px",
-  },
-
-  logoIcono: {
-    width: "44px",
-    height: "44px",
-    borderRadius: "12px",
-    background: "#1b7542",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: "24px",
   },
 
   contenido: {
@@ -769,7 +1023,8 @@ const estilos: Record<string, React.CSSProperties> = {
 
   resumenGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    gridTemplateColumns:
+      "repeat(3, minmax(0, 1fr))",
     gap: "18px",
     marginBottom: "22px",
   },
@@ -806,7 +1061,8 @@ const estilos: Record<string, React.CSSProperties> = {
     borderRadius: "15px",
     padding: "24px",
     marginBottom: "22px",
-    boxShadow: "0 5px 18px rgba(26,72,45,0.04)",
+    boxShadow:
+      "0 5px 18px rgba(26,72,45,0.04)",
   },
 
   formTitulo: {
@@ -817,7 +1073,8 @@ const estilos: Record<string, React.CSSProperties> = {
 
   formGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gridTemplateColumns:
+      "repeat(2, minmax(0, 1fr))",
     gap: "17px",
   },
 
@@ -856,7 +1113,8 @@ const estilos: Record<string, React.CSSProperties> = {
 
   tablaHeader: {
     padding: "20px 22px",
-    borderBottom: "1px solid #edf1ee",
+    borderBottom:
+      "1px solid #edf1ee",
   },
 
   tablaTitulo: {
@@ -884,13 +1142,15 @@ const estilos: Record<string, React.CSSProperties> = {
     background: "#f7faf7",
     color: "#66776c",
     fontWeight: 700,
-    borderBottom: "1px solid #edf1ee",
+    borderBottom:
+      "1px solid #edf1ee",
     whiteSpace: "nowrap",
   },
 
   td: {
     padding: "14px 16px",
-    borderBottom: "1px solid #edf1ee",
+    borderBottom:
+      "1px solid #edf1ee",
     color: "#45594c",
     whiteSpace: "nowrap",
   },
