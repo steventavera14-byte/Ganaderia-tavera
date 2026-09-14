@@ -61,7 +61,7 @@ export default function Sidebar() {
     {
       texto: "Personal",
       icono: "👥",
-      ruta: null,
+      ruta: "/personal",
     },
     {
       texto: "Gastos",
