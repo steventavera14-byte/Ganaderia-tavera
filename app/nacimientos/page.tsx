@@ -223,16 +223,31 @@ export default function NacimientosPage() {
 
   const totalMachos = registros
     .filter((r) => r.sexo === "macho")
-    .reduce((suma, r) => suma + Number(r.cantidad || 0), 0);
+    .reduce(
+      (suma, r) => suma + Number(r.cantidad || 0),
+      0
+    );
 
   const totalHembras = registros
     .filter((r) => r.sexo === "hembra")
-    .reduce((suma, r) => suma + Number(r.cantidad || 0), 0);
+    .reduce(
+      (suma, r) => suma + Number(r.cantidad || 0),
+      0
+    );
 
   const totalNacimientos = registros.reduce(
     (suma, r) => suma + Number(r.cantidad || 0),
     0
   );
+
+  const formatearFecha = (fecha: string) => {
+    return new Date(fecha).toLocaleDateString("es-BO", {
+      timeZone: "UTC",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  };
 
   if (loading) {
     return (
@@ -255,25 +270,83 @@ export default function NacimientosPage() {
           </div>
         </div>
 
-        <MenuItem texto="Dashboard" icono="▦" ruta="/dashboard" />
-        <MenuItem texto="Ganado" icono="🐄" />
-        <MenuItem texto="Lotes" icono="▣" ruta="/lotes" />
-        <MenuItem texto="Potreros" icono="🌱" ruta="/potreros" />
-        <MenuItem texto="Nacimientos" icono="🐮" activo />
-        <MenuItem texto="Pesajes" icono="⚖" />
-        <MenuItem texto="Movimientos" icono="↔" />
-        <MenuItem texto="Sanidad" icono="♥" />
-        <MenuItem texto="Feedlot" icono="🌾" />
-        <MenuItem texto="Maquinaria" icono="🚜" />
-        <MenuItem texto="Personal" icono="👥" />
-        <MenuItem texto="Gastos" icono="$" />
-        <MenuItem texto="Reportes" icono="▤" />
+        <MenuItem
+          texto="Dashboard"
+          icono="▦"
+          ruta="/dashboard"
+        />
+
+        <MenuItem
+          texto="Ganado"
+          icono="🐄"
+        />
+
+        <MenuItem
+          texto="Lotes"
+          icono="▣"
+          ruta="/lotes"
+        />
+
+        <MenuItem
+          texto="Potreros"
+          icono="🌱"
+          ruta="/potreros"
+        />
+
+        <MenuItem
+          texto="Nacimientos"
+          icono="🐮"
+          activo
+        />
+
+        <MenuItem
+          texto="Pesajes"
+          icono="⚖"
+        />
+
+        <MenuItem
+          texto="Movimientos"
+          icono="↔"
+        />
+
+        <MenuItem
+          texto="Sanidad"
+          icono="♥"
+        />
+
+        <MenuItem
+          texto="Feedlot"
+          icono="🌾"
+        />
+
+        <MenuItem
+          texto="Maquinaria"
+          icono="🚜"
+        />
+
+        <MenuItem
+          texto="Personal"
+          icono="👥"
+        />
+
+        <MenuItem
+          texto="Gastos"
+          icono="$"
+        />
+
+        <MenuItem
+          texto="Reportes"
+          icono="▤"
+        />
       </aside>
 
       <section style={estilos.contenido}>
         <header style={estilos.header}>
           <div>
-            <h1 style={estilos.titulo}>Nacimientos</h1>
+            <h1 style={estilos.titulo}>
+              Nacimientos
+            </h1>
+
             <p style={estilos.subtitulo}>
               Registro y control de nacimientos por lote
             </p>
@@ -339,7 +412,9 @@ export default function NacimientosPage() {
 
             <div style={estilos.formGrid}>
               <div>
-                <label style={estilos.label}>Fecha *</label>
+                <label style={estilos.label}>
+                  Fecha *
+                </label>
 
                 <input
                   type="date"
@@ -355,7 +430,9 @@ export default function NacimientosPage() {
               </div>
 
               <div>
-                <label style={estilos.label}>Lote *</label>
+                <label style={estilos.label}>
+                  Lote *
+                </label>
 
                 <select
                   value={form.lote_id}
@@ -369,7 +446,10 @@ export default function NacimientosPage() {
                   </option>
 
                   {lotes.map((lote) => (
-                    <option key={lote.id} value={lote.id}>
+                    <option
+                      key={lote.id}
+                      value={lote.id}
+                    >
                       {lote.nombre}
                     </option>
                   ))}
@@ -377,7 +457,9 @@ export default function NacimientosPage() {
               </div>
 
               <div>
-                <label style={estilos.label}>Potrero</label>
+                <label style={estilos.label}>
+                  Potrero
+                </label>
 
                 <select
                   value={form.potrero_id}
@@ -403,7 +485,9 @@ export default function NacimientosPage() {
               </div>
 
               <div>
-                <label style={estilos.label}>Sexo *</label>
+                <label style={estilos.label}>
+                  Sexo *
+                </label>
 
                 <select
                   value={form.sexo}
@@ -415,13 +499,20 @@ export default function NacimientosPage() {
                   }
                   style={estilos.input}
                 >
-                  <option value="macho">Macho</option>
-                  <option value="hembra">Hembra</option>
+                  <option value="macho">
+                    Macho
+                  </option>
+
+                  <option value="hembra">
+                    Hembra
+                  </option>
                 </select>
               </div>
 
               <div>
-                <label style={estilos.label}>Cantidad *</label>
+                <label style={estilos.label}>
+                  Cantidad *
+                </label>
 
                 <input
                   type="number"
@@ -486,7 +577,9 @@ export default function NacimientosPage() {
               <button
                 type="button"
                 style={estilos.botonSecundario}
-                onClick={() => setMostrarFormulario(false)}
+                onClick={() =>
+                  setMostrarFormulario(false)
+                }
               >
                 Cancelar
               </button>
@@ -521,10 +614,14 @@ export default function NacimientosPage() {
 
           {registros.length === 0 ? (
             <div style={estilos.vacio}>
-              <div style={{ fontSize: "38px" }}>🐮</div>
+              <div style={{ fontSize: "38px" }}>
+                🐮
+              </div>
+
               <strong>
                 No hay nacimientos registrados
               </strong>
+
               <span>
                 Utiliza “Registrar nacimiento” para comenzar.
               </span>
@@ -534,11 +631,25 @@ export default function NacimientosPage() {
               <table style={estilos.tabla}>
                 <thead>
                   <tr>
-                    <th style={estilos.th}>Fecha</th>
-                    <th style={estilos.th}>Lote</th>
-                    <th style={estilos.th}>Sexo</th>
-                    <th style={estilos.th}>Cantidad</th>
-                    <th style={estilos.th}>Detalle</th>
+                    <th style={estilos.th}>
+                      Fecha
+                    </th>
+
+                    <th style={estilos.th}>
+                      Lote
+                    </th>
+
+                    <th style={estilos.th}>
+                      Sexo
+                    </th>
+
+                    <th style={estilos.th}>
+                      Cantidad
+                    </th>
+
+                    <th style={estilos.th}>
+                      Detalle
+                    </th>
                   </tr>
                 </thead>
 
@@ -546,13 +657,15 @@ export default function NacimientosPage() {
                   {registros.map((registro) => (
                     <tr key={registro.id}>
                       <td style={estilos.td}>
-                        {registro.fecha}
+                        {formatearFecha(
+                          registro.fecha
+                        )}
                       </td>
 
                       <td style={estilos.td}>
                         <strong>
-                          {registro.gan_lotes_ganado?.nombre ||
-                            "—"}
+                          {registro.gan_lotes_ganado
+                            ?.nombre || "—"}
                         </strong>
                       </td>
 
@@ -561,11 +674,13 @@ export default function NacimientosPage() {
                           style={{
                             ...estilos.estado,
                             background:
-                              registro.sexo === "hembra"
+                              registro.sexo ===
+                              "hembra"
                                 ? "#fff1f5"
                                 : "#eef4ff",
                             color:
-                              registro.sexo === "hembra"
+                              registro.sexo ===
+                              "hembra"
                                 ? "#a83b64"
                                 : "#315b9b",
                           }}
@@ -579,7 +694,8 @@ export default function NacimientosPage() {
                       </td>
 
                       <td style={estilos.td}>
-                        {registro.descripcion || "—"}
+                        {registro.descripcion ||
+                          "—"}
                       </td>
                     </tr>
                   ))}
@@ -607,7 +723,9 @@ function MenuItem({
   return (
     <div
       onClick={() => {
-        if (ruta) window.location.href = ruta;
+        if (ruta) {
+          window.location.href = ruta;
+        }
       }}
       style={{
         display: "flex",
@@ -771,8 +889,7 @@ const estilos: Record<string, React.CSSProperties> = {
 
   resumenGrid: {
     display: "grid",
-    gridTemplateColumns:
-      "repeat(3, minmax(0, 1fr))",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
     gap: "18px",
     marginBottom: "22px",
   },
@@ -819,8 +936,7 @@ const estilos: Record<string, React.CSSProperties> = {
 
   formGrid: {
     display: "grid",
-    gridTemplateColumns:
-      "repeat(3, minmax(0, 1fr))",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
     gap: "17px",
   },
 
