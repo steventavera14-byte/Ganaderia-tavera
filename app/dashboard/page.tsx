@@ -298,7 +298,9 @@ export default function DashboardPage() {
         <MenuItem
           texto="Lotes"
           icono="▣"
-          onClick={() => irA("/lotes")}
+          onClick={() =>
+            irA("/lotes")
+          }
         />
 
         <MenuItem
@@ -328,6 +330,9 @@ export default function DashboardPage() {
         <MenuItem
           texto="Movimientos"
           icono="↔"
+          onClick={() =>
+            irA("/movimientos")
+          }
         />
 
         <MenuItem
@@ -378,8 +383,7 @@ export default function DashboardPage() {
             </h1>
 
             <p style={estilos.subtitulo}>
-              Resumen general de Ganadería
-              Tavera
+              Resumen general de Ganadería Tavera
             </p>
           </div>
 
@@ -446,8 +450,8 @@ export default function DashboardPage() {
           <Panel titulo="Distribución del ganado">
             {lotes.length === 0 ? (
               <div style={estilos.vacio}>
-                Los datos de lotes y
-                potreros aparecerán aquí.
+                Los datos de lotes y potreros
+                aparecerán aquí.
               </div>
             ) : (
               <div>
