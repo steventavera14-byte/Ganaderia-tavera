@@ -46,7 +46,7 @@ export default function Sidebar() {
     {
       texto: "Sanidad",
       icono: "♥",
-      ruta: null,
+      ruta: "/sanidad",
     },
     {
       texto: "Feedlot",
