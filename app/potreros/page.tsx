@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
+import Sidebar from "../components/Sidebar";
 
 type Potrero = {
   id: string;
@@ -99,10 +100,7 @@ export default function PotrerosPage() {
       return;
     }
 
-    if (
-      form.hectareas &&
-      Number(form.hectareas) <= 0
-    ) {
+    if (form.hectareas && Number(form.hectareas) <= 0) {
       setMensaje("Las hectáreas deben ser mayores a cero.");
       return;
     }
@@ -166,85 +164,7 @@ export default function PotrerosPage() {
 
   return (
     <main style={estilos.pagina}>
-      <aside style={estilos.sidebar}>
-        <div style={estilos.logo}>
-          <div style={estilos.logoIcono}>🐂</div>
-
-          <div>
-            <strong>Ganadería</strong>
-            <br />
-            <strong>Tavera</strong>
-          </div>
-        </div>
-
-        <MenuItem
-          texto="Dashboard"
-          icono="▦"
-          ruta="/dashboard"
-        />
-
-        <MenuItem
-          texto="Ganado"
-          icono="🐄"
-        />
-
-        <MenuItem
-          texto="Lotes"
-          icono="▣"
-          ruta="/lotes"
-        />
-
-        <MenuItem
-          texto="Potreros"
-          icono="🌱"
-          activo
-        />
-
-        <MenuItem
-          texto="Nacimientos"
-          icono="🐮"
-        />
-
-        <MenuItem
-          texto="Pesajes"
-          icono="⚖"
-        />
-
-        <MenuItem
-          texto="Movimientos"
-          icono="↔"
-        />
-
-        <MenuItem
-          texto="Sanidad"
-          icono="♥"
-        />
-
-        <MenuItem
-          texto="Feedlot"
-          icono="🌾"
-        />
-
-        <MenuItem
-          texto="Maquinaria"
-          icono="🚜"
-        />
-
-        <MenuItem
-          texto="Personal"
-          icono="👥"
-        />
-
-        <MenuItem
-          texto="Gastos"
-          icono="$"
-        />
-
-        <MenuItem
-          texto="Reportes"
-          icono="▤"
-        />
-      </aside>
+      <Sidebar />
 
       <section style={estilos.contenido}>
         <header style={estilos.header}>
@@ -262,9 +182,7 @@ export default function PotrerosPage() {
             style={estilos.botonPrincipal}
             onClick={() => {
               setMensaje("");
-              setMostrarFormulario(
-                !mostrarFormulario
-              );
+              setMostrarFormulario(!mostrarFormulario);
             }}
           >
             {mostrarFormulario
@@ -277,14 +195,10 @@ export default function PotrerosPage() {
           <div
             style={{
               ...estilos.mensaje,
-              background: mensaje.includes(
-                "correctamente"
-              )
+              background: mensaje.includes("correctamente")
                 ? "#edf8f0"
                 : "#fff1f1",
-              color: mensaje.includes(
-                "correctamente"
-              )
+              color: mensaje.includes("correctamente")
                 ? "#176b3a"
                 : "#b42318",
             }}
@@ -461,9 +375,7 @@ export default function PotrerosPage() {
 
               <span style={estilos.tablaSubtitulo}>
                 {potreros.length} potrero
-                {potreros.length === 1
-                  ? ""
-                  : "s"}
+                {potreros.length === 1 ? "" : "s"}
               </span>
             </div>
           </div>
@@ -528,15 +440,12 @@ export default function PotrerosPage() {
 
                       <td style={estilos.td}>
                         <Estado
-                          estado={
-                            potrero.estado
-                          }
+                          estado={potrero.estado}
                         />
                       </td>
 
                       <td style={estilos.td}>
-                        {potrero.observaciones ||
-                          "—"}
+                        {potrero.observaciones || "—"}
                       </td>
                     </tr>
                   ))}
@@ -547,55 +456,6 @@ export default function PotrerosPage() {
         </div>
       </section>
     </main>
-  );
-}
-
-function MenuItem({
-  texto,
-  icono,
-  ruta,
-  activo = false,
-}: {
-  texto: string;
-  icono: string;
-  ruta?: string;
-  activo?: boolean;
-}) {
-  return (
-    <div
-      onClick={() => {
-        if (ruta) {
-          window.location.href = ruta;
-        }
-      }}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "12px",
-        padding: "11px 12px",
-        marginBottom: "5px",
-        borderRadius: "9px",
-        background: activo
-          ? "rgba(255,255,255,0.14)"
-          : "transparent",
-        cursor: ruta
-          ? "pointer"
-          : "default",
-        fontSize: "14px",
-        fontWeight: activo ? 700 : 500,
-      }}
-    >
-      <span
-        style={{
-          width: "22px",
-          textAlign: "center",
-        }}
-      >
-        {icono}
-      </span>
-
-      {texto}
-    </div>
   );
 }
 
@@ -686,38 +546,6 @@ const estilos: Record<
     fontFamily: "Arial, sans-serif",
     color: "#176b3a",
     fontWeight: 700,
-  },
-
-  sidebar: {
-    position: "fixed",
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: "235px",
-    background: "#103f28",
-    color: "white",
-    padding: "26px 18px",
-    boxSizing: "border-box",
-    overflowY: "auto",
-  },
-
-  logo: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    marginBottom: "32px",
-    paddingLeft: "8px",
-  },
-
-  logoIcono: {
-    width: "44px",
-    height: "44px",
-    borderRadius: "12px",
-    background: "#1b7542",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: "24px",
   },
 
   contenido: {
