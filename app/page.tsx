@@ -14,18 +14,37 @@ export default function Home() {
     setLoading(true);
     setMensaje("");
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
 
-    if (error) {
-      setMensaje("Correo o contraseña incorrectos.");
+      if (error) {
+        console.error("Error Supabase:", error);
+        setMensaje(`Supabase: ${error.message}`);
+        setLoading(false);
+        return;
+      }
+
+      if (!data.session) {
+        setMensaje("Supabase no devolvió una sesión válida.");
+        setLoading(false);
+        return;
+      }
+
+      window.location.href = "/dashboard";
+    } catch (error) {
+      console.error("Error inesperado:", error);
+
+      if (error instanceof Error) {
+        setMensaje(`Error: ${error.message}`);
+      } else {
+        setMensaje("Ocurrió un error inesperado.");
+      }
+
       setLoading(false);
-      return;
     }
-
-    window.location.href = "/dashboard";
   };
 
   return (
@@ -111,6 +130,7 @@ export default function Home() {
             onChange={(e) => setEmail(e.target.value)}
             placeholder="correo@ejemplo.com"
             required
+            autoComplete="email"
             style={{
               width: "100%",
               boxSizing: "border-box",
@@ -141,6 +161,7 @@ export default function Home() {
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
             required
+            autoComplete="current-password"
             style={{
               width: "100%",
               boxSizing: "border-box",
@@ -163,6 +184,7 @@ export default function Home() {
                 marginBottom: "18px",
                 fontSize: "13px",
                 textAlign: "center",
+                wordBreak: "break-word",
               }}
             >
               {mensaje}
