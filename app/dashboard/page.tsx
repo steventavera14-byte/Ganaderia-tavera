@@ -10,8 +10,8 @@ type Lote = {
   cantidad_machos: number;
   cantidad_hembras: number;
   peso_promedio: number | null;
-  estado: string;
   potrero_id: string | null;
+  estado: string;
 };
 
 type Potrero = {
@@ -22,22 +22,26 @@ type Potrero = {
 };
 
 type Nacimiento = {
-  sexo: string;
+  cantidad: number;
+  sexo: string | null;
 };
 
-export default function Dashboard() {
-  const [nombre, setNombre] = useState("Steven");
+export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
+
+  const [nombreUsuario, setNombreUsuario] =
+    useState("Steven");
 
   const [lotes, setLotes] = useState<Lote[]>([]);
   const [potreros, setPotreros] = useState<Potrero[]>([]);
-  const [nacimientos, setNacimientos] = useState<Nacimiento[]>([]);
+  const [nacimientos, setNacimientos] =
+    useState<Nacimiento[]>([]);
 
   useEffect(() => {
-    cargarDashboard();
+    iniciarDashboard();
   }, []);
 
-  const cargarDashboard = async () => {
+  const iniciarDashboard = async () => {
     setLoading(true);
 
     const {
@@ -49,12 +53,13 @@ export default function Dashboard() {
       return;
     }
 
-    const { data: usuario, error: errorUsuario } = await supabase
-      .from("gan_usuarios")
-      .select("finca_id, nombre, rol")
-      .eq("user_id", user.id)
-      .eq("activo", true)
-      .maybeSingle();
+    const { data: usuario, error: errorUsuario } =
+      await supabase
+        .from("gan_usuarios")
+        .select("finca_id, nombre, rol, activo")
+        .eq("user_id", user.id)
+        .eq("activo", true)
+        .maybeSingle();
 
     if (errorUsuario || !usuario) {
       await supabase.auth.signOut();
@@ -63,44 +68,189 @@ export default function Dashboard() {
     }
 
     if (usuario.nombre) {
-      setNombre(usuario.nombre.split(" ")[0]);
+      const primerNombre =
+        usuario.nombre.split(" ")[0];
+
+      setNombreUsuario(primerNombre);
     }
 
-    const fincaId = usuario.finca_id;
-
-    const [respuestaLotes, respuestaPotreros, respuestaNacimientos] =
-      await Promise.all([
-        supabase
-          .from("gan_lotes_ganado")
-          .select(
-            "id, nombre, cantidad_total, cantidad_machos, cantidad_hembras, peso_promedio, estado, potrero_id"
-          )
-          .eq("finca_id", fincaId),
-
-        supabase
-          .from("gan_potreros")
-          .select("id, nombre, hectareas, estado")
-          .eq("finca_id", fincaId),
-
-        supabase
-          .from("gan_nacimientos")
-          .select("sexo")
-          .eq("finca_id", fincaId),
-      ]);
-
-    if (!respuestaLotes.error) {
-      setLotes(respuestaLotes.data || []);
-    }
-
-    if (!respuestaPotreros.error) {
-      setPotreros(respuestaPotreros.data || []);
-    }
-
-    if (!respuestaNacimientos.error) {
-      setNacimientos(respuestaNacimientos.data || []);
-    }
+    await cargarDashboard(usuario.finca_id);
 
     setLoading(false);
+  };
+
+  const cargarDashboard = async (
+    fincaId: string
+  ) => {
+    const [
+      resultadoLotes,
+      resultadoPotreros,
+      resultadoNacimientos,
+    ] = await Promise.all([
+      supabase
+        .from("gan_lotes_ganado")
+        .select(
+          `
+          id,
+          nombre,
+          cantidad_total,
+          cantidad_machos,
+          cantidad_hembras,
+          peso_promedio,
+          potrero_id,
+          estado
+        `
+        )
+        .eq("finca_id", fincaId)
+        .in("estado", ["activo", "feedlot"])
+        .order("nombre"),
+
+      supabase
+        .from("gan_potreros")
+        .select(
+          `
+          id,
+          nombre,
+          hectareas,
+          estado
+        `
+        )
+        .eq("finca_id", fincaId)
+        .order("nombre"),
+
+      supabase
+        .from("gan_lote_eventos")
+        .select(
+          `
+          cantidad,
+          sexo,
+          gan_lotes_ganado!inner (
+            finca_id
+          )
+        `
+        )
+        .eq("tipo", "nacimiento")
+        .eq(
+          "gan_lotes_ganado.finca_id",
+          fincaId
+        ),
+    ]);
+
+    if (resultadoLotes.error) {
+      console.error(
+        "Error cargando lotes:",
+        resultadoLotes.error
+      );
+    }
+
+    if (resultadoPotreros.error) {
+      console.error(
+        "Error cargando potreros:",
+        resultadoPotreros.error
+      );
+    }
+
+    if (resultadoNacimientos.error) {
+      console.error(
+        "Error cargando nacimientos:",
+        resultadoNacimientos.error
+      );
+    }
+
+    setLotes(resultadoLotes.data || []);
+    setPotreros(resultadoPotreros.data || []);
+
+    setNacimientos(
+      (resultadoNacimientos.data ||
+        []) as unknown as Nacimiento[]
+    );
+  };
+
+  const ganadoTotal = lotes.reduce(
+    (suma, lote) =>
+      suma + Number(lote.cantidad_total || 0),
+    0
+  );
+
+  const lotesActivos = lotes.length;
+
+  const machosNacidos = nacimientos
+    .filter(
+      (nacimiento) =>
+        nacimiento.sexo === "macho"
+    )
+    .reduce(
+      (suma, nacimiento) =>
+        suma +
+        Number(nacimiento.cantidad || 0),
+      0
+    );
+
+  const hembrasNacidas = nacimientos
+    .filter(
+      (nacimiento) =>
+        nacimiento.sexo === "hembra"
+    )
+    .reduce(
+      (suma, nacimiento) =>
+        suma +
+        Number(nacimiento.cantidad || 0),
+      0
+    );
+
+  const totalNacimientos =
+    machosNacidos + hembrasNacidas;
+
+  const animalesConPeso = lotes.filter(
+    (lote) =>
+      lote.peso_promedio !== null &&
+      Number(lote.peso_promedio) > 0 &&
+      Number(lote.cantidad_total) > 0
+  );
+
+  const pesoTotalPonderado =
+    animalesConPeso.reduce(
+      (suma, lote) =>
+        suma +
+        Number(lote.peso_promedio || 0) *
+          Number(lote.cantidad_total || 0),
+      0
+    );
+
+  const cantidadConPeso =
+    animalesConPeso.reduce(
+      (suma, lote) =>
+        suma +
+        Number(lote.cantidad_total || 0),
+      0
+    );
+
+  const pesoPromedio =
+    cantidadConPeso > 0
+      ? pesoTotalPonderado /
+        cantidadConPeso
+      : 0;
+
+  const superficieTotal =
+    potreros.reduce(
+      (suma, potrero) =>
+        suma +
+        Number(potrero.hectareas || 0),
+      0
+    );
+
+  const potrerosConGanado = new Set(
+    lotes
+      .filter(
+        (lote) =>
+          lote.potrero_id &&
+          Number(lote.cantidad_total) > 0
+      )
+      .map((lote) => lote.potrero_id)
+  ).size;
+
+  const irA = (ruta: string) => {
+    window.location.href = ruta;
   };
 
   const cerrarSesion = async () => {
@@ -108,327 +258,153 @@ export default function Dashboard() {
     window.location.href = "/";
   };
 
-  const lotesActivos = lotes.filter(
-    (lote) =>
-      lote.estado === "activo" ||
-      lote.estado === "feedlot"
-  );
-
-  const ganadoTotal = lotesActivos.reduce(
-    (suma, lote) =>
-      suma + Number(lote.cantidad_total || 0),
-    0
-  );
-
-  const lotesConPeso = lotesActivos.filter(
-    (lote) =>
-      lote.peso_promedio !== null &&
-      Number(lote.peso_promedio) > 0 &&
-      Number(lote.cantidad_total) > 0
-  );
-
-  const animalesConPeso = lotesConPeso.reduce(
-    (suma, lote) =>
-      suma + Number(lote.cantidad_total),
-    0
-  );
-
-  const pesoTotalPonderado = lotesConPeso.reduce(
-    (suma, lote) =>
-      suma +
-      Number(lote.peso_promedio) *
-        Number(lote.cantidad_total),
-    0
-  );
-
-  const pesoPromedio =
-    animalesConPeso > 0
-      ? pesoTotalPonderado / animalesConPeso
-      : 0;
-
-  const machosNacidos = nacimientos.filter(
-    (nacimiento) =>
-      nacimiento.sexo === "macho"
-  ).length;
-
-  const hembrasNacidas = nacimientos.filter(
-    (nacimiento) =>
-      nacimiento.sexo === "hembra"
-  ).length;
-
-  const potrerosOcupadosIds = new Set(
-    lotesActivos
-      .filter((lote) => lote.potrero_id)
-      .map((lote) => lote.potrero_id)
-  );
-
-  const potrerosOcupados =
-    potrerosOcupadosIds.size;
-
-  const hectareasTotales = potreros.reduce(
-    (suma, potrero) =>
-      suma + Number(potrero.hectareas || 0),
-    0
-  );
-
   if (loading) {
     return (
-      <main
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "#f4f7f3",
-          fontFamily: "Arial, sans-serif",
-          color: "#176b3a",
-          fontWeight: 700,
-        }}
-      >
+      <main style={estilos.cargando}>
         Cargando Ganadería Tavera...
       </main>
     );
   }
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: "#f4f7f3",
-        fontFamily: "Arial, sans-serif",
-        color: "#20352a",
-      }}
-    >
-      <aside
-        style={{
-          position: "fixed",
-          left: 0,
-          top: 0,
-          bottom: 0,
-          width: "235px",
-          background: "#103f28",
-          color: "white",
-          padding: "26px 18px",
-          boxSizing: "border-box",
-          overflowY: "auto",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
-            marginBottom: "32px",
-            paddingLeft: "8px",
-          }}
-        >
-          <div
-            style={{
-              width: "44px",
-              height: "44px",
-              borderRadius: "12px",
-              background: "#1b7542",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "24px",
-            }}
-          >
+    <main style={estilos.pagina}>
+      <aside style={estilos.sidebar}>
+        <div style={estilos.logo}>
+          <div style={estilos.logoIcono}>
             🐂
           </div>
 
           <div>
-            <div
-              style={{
-                fontSize: "17px",
-                fontWeight: 800,
-              }}
-            >
-              Ganadería
-            </div>
-
-            <div
-              style={{
-                fontSize: "17px",
-                fontWeight: 800,
-              }}
-            >
-              Tavera
-            </div>
+            <strong>Ganadería</strong>
+            <br />
+            <strong>Tavera</strong>
           </div>
         </div>
 
         <MenuItem
+          texto="Dashboard"
           icono="▦"
-          titulo="Dashboard"
           activo
-          ruta="/dashboard"
+          onClick={() =>
+            irA("/dashboard")
+          }
         />
 
         <MenuItem
+          texto="Ganado"
           icono="🐄"
-          titulo="Ganado"
         />
 
         <MenuItem
+          texto="Lotes"
           icono="▣"
-          titulo="Lotes"
-          ruta="/lotes"
+          onClick={() => irA("/lotes")}
         />
 
         <MenuItem
+          texto="Potreros"
           icono="🌱"
-          titulo="Potreros"
-          ruta="/potreros"
+          onClick={() =>
+            irA("/potreros")
+          }
         />
 
         <MenuItem
+          texto="Nacimientos"
           icono="🐮"
-          titulo="Nacimientos"
+          onClick={() =>
+            irA("/nacimientos")
+          }
         />
 
         <MenuItem
+          texto="Pesajes"
           icono="⚖"
-          titulo="Pesajes"
         />
 
         <MenuItem
+          texto="Movimientos"
           icono="↔"
-          titulo="Movimientos"
         />
 
         <MenuItem
+          texto="Sanidad"
           icono="♥"
-          titulo="Sanidad"
         />
 
         <MenuItem
+          texto="Feedlot"
           icono="🌾"
-          titulo="Feedlot"
         />
 
         <MenuItem
+          texto="Maquinaria"
           icono="🚜"
-          titulo="Maquinaria"
         />
 
         <MenuItem
+          texto="Personal"
           icono="👥"
-          titulo="Personal"
         />
 
         <MenuItem
+          texto="Gastos"
           icono="$"
-          titulo="Gastos"
         />
 
         <MenuItem
+          texto="Reportes"
           icono="▤"
-          titulo="Reportes"
         />
 
-        <div
-          style={{
-            marginTop: "30px",
-            borderTop:
-              "1px solid rgba(255,255,255,0.15)",
-            paddingTop: "20px",
-          }}
+        <div style={estilos.separador} />
+
+        <button
+          onClick={cerrarSesion}
+          style={estilos.cerrarSesion}
         >
-          <button
-            onClick={cerrarSesion}
-            style={{
-              width: "100%",
-              background: "transparent",
-              border:
-                "1px solid rgba(255,255,255,0.25)",
-              borderRadius: "9px",
-              color: "white",
-              padding: "10px",
-              cursor: "pointer",
-            }}
-          >
-            Cerrar sesión
-          </button>
-        </div>
+          Cerrar sesión
+        </button>
       </aside>
 
-      <section
-        style={{
-          marginLeft: "235px",
-          padding: "32px",
-        }}
-      >
-        <header
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: "30px",
-          }}
-        >
+      <section style={estilos.contenido}>
+        <header style={estilos.header}>
           <div>
-            <h1
-              style={{
-                margin: 0,
-                fontSize: "28px",
-                color: "#143e28",
-              }}
-            >
-              Hola, {nombre}
+            <h1 style={estilos.titulo}>
+              Hola, {nombreUsuario}
             </h1>
 
-            <p
-              style={{
-                margin: "7px 0 0",
-                color: "#718078",
-                fontSize: "14px",
-              }}
-            >
-              Resumen general de Ganadería Tavera
+            <p style={estilos.subtitulo}>
+              Resumen general de Ganadería
+              Tavera
             </p>
           </div>
 
-          <div
-            style={{
-              background: "white",
-              border: "1px solid #dfe8e1",
-              borderRadius: "12px",
-              padding: "10px 16px",
-              fontSize: "13px",
-              color: "#52705e",
-            }}
-          >
+          <div style={estilos.operacion}>
             🟢 Operación activa
           </div>
         </header>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns:
-              "repeat(auto-fit, minmax(190px, 1fr))",
-            gap: "18px",
-            marginBottom: "25px",
-          }}
-        >
+        <div style={estilos.tarjetas}>
           <Tarjeta
             titulo="Ganado total"
-            valor={ganadoTotal.toLocaleString()}
+            valor={String(ganadoTotal)}
             detalle="Animales en lotes activos"
             icono="🐄"
           />
 
           <Tarjeta
             titulo="Lotes activos"
-            valor={String(lotesActivos.length)}
+            valor={String(lotesActivos)}
             detalle="Grupos de ganado"
             icono="▣"
           />
 
           <Tarjeta
             titulo="Nacimientos"
-            valor={String(nacimientos.length)}
+            valor={String(
+              totalNacimientos
+            )}
             detalle="Registrados"
             icono="🐮"
           />
@@ -439,7 +415,7 @@ export default function Dashboard() {
               pesoPromedio > 0
                 ? `${Math.round(
                     pesoPromedio
-                  ).toLocaleString()} kg`
+                  )} kg`
                 : "—"
             }
             detalle="Promedio ponderado"
@@ -448,8 +424,10 @@ export default function Dashboard() {
 
           <Tarjeta
             titulo="Potreros"
-            valor={String(potreros.length)}
-            detalle={`${hectareasTotales.toLocaleString()} ha registradas`}
+            valor={String(
+              potreros.length
+            )}
+            detalle={`${superficieTotal} ha registradas`}
             icono="🌱"
           />
 
@@ -461,66 +439,54 @@ export default function Dashboard() {
           />
         </div>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "2fr 1fr",
-            gap: "20px",
-            marginBottom: "20px",
-          }}
-        >
+        <div style={estilos.gridSuperior}>
           <Panel titulo="Distribución del ganado">
-            {lotesActivos.length === 0 ? (
-              <Vacio texto="No hay lotes activos registrados." />
+            {lotes.length === 0 ? (
+              <div style={estilos.vacio}>
+                Los datos de lotes y
+                potreros aparecerán aquí.
+              </div>
             ) : (
-              <div
-                style={{
-                  display: "grid",
-                  gap: "10px",
-                }}
-              >
-                {lotesActivos.map((lote) => (
+              <div>
+                {lotes.map((lote) => (
                   <div
                     key={lote.id}
-                    style={{
-                      display: "flex",
-                      justifyContent:
-                        "space-between",
-                      alignItems: "center",
-                      background: "#f7faf7",
-                      borderRadius: "9px",
-                      padding: "13px 15px",
-                    }}
+                    style={
+                      estilos.filaResumen
+                    }
                   >
                     <div>
-                      <strong
-                        style={{
-                          color: "#31513d",
-                          fontSize: "13px",
-                        }}
-                      >
+                      <strong>
                         {lote.nombre}
                       </strong>
 
                       <div
-                        style={{
-                          marginTop: "4px",
-                          color: "#8b998f",
-                          fontSize: "11px",
-                        }}
+                        style={
+                          estilos.detalleFila
+                        }
                       >
-                        {lote.cantidad_machos} machos ·{" "}
-                        {lote.cantidad_hembras} hembras
+                        {Number(
+                          lote.cantidad_machos ||
+                            0
+                        )}{" "}
+                        machos ·{" "}
+                        {Number(
+                          lote.cantidad_hembras ||
+                            0
+                        )}{" "}
+                        hembras
                       </div>
                     </div>
 
                     <strong
-                      style={{
-                        color: "#176b3a",
-                        fontSize: "17px",
-                      }}
+                      style={
+                        estilos.numeroVerde
+                      }
                     >
-                      {lote.cantidad_total}
+                      {Number(
+                        lote.cantidad_total ||
+                          0
+                      )}
                     </strong>
                   </div>
                 ))}
@@ -529,73 +495,43 @@ export default function Dashboard() {
           </Panel>
 
           <Panel titulo="Resumen de nacimientos">
-            <div
-              style={{
-                display: "grid",
-                gap: "12px",
-                paddingTop: "10px",
-              }}
-            >
-              <Resumen
-                etiqueta="Machos"
-                valor={String(machosNacidos)}
-              />
+            <FilaDato
+              texto="Machos"
+              valor={machosNacidos}
+            />
 
-              <Resumen
-                etiqueta="Hembras"
-                valor={String(hembrasNacidas)}
-              />
+            <FilaDato
+              texto="Hembras"
+              valor={hembrasNacidas}
+            />
 
-              <Resumen
-                etiqueta="Total"
-                valor={String(nacimientos.length)}
-              />
-            </div>
+            <FilaDato
+              texto="Total"
+              valor={totalNacimientos}
+            />
           </Panel>
         </div>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: "20px",
-          }}
-        >
+        <div style={estilos.gridInferior}>
           <Panel titulo="Potreros">
-            <div
-              style={{
-                display: "grid",
-                gap: "12px",
-              }}
-            >
-              <Resumen
-                etiqueta="Potreros registrados"
-                valor={String(potreros.length)}
-              />
+            <FilaDato
+              texto="Potreros registrados"
+              valor={potreros.length}
+            />
 
-              <Resumen
-                etiqueta="Potreros con ganado"
-                valor={String(potrerosOcupados)}
-              />
+            <FilaDato
+              texto="Potreros con ganado"
+              valor={potrerosConGanado}
+            />
 
-              <Resumen
-                etiqueta="Superficie registrada"
-                valor={`${hectareasTotales.toLocaleString()} ha`}
-              />
-            </div>
+            <FilaDato
+              texto="Superficie registrada"
+              valor={`${superficieTotal} ha`}
+            />
           </Panel>
 
           <Panel titulo="Alertas y pendientes">
-            <div
-              style={{
-                minHeight: "150px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#91a097",
-                textAlign: "center",
-              }}
-            >
+            <div style={estilos.vacio}>
               No hay alertas pendientes.
             </div>
           </Panel>
@@ -606,23 +542,19 @@ export default function Dashboard() {
 }
 
 function MenuItem({
+  texto,
   icono,
-  titulo,
-  ruta,
   activo = false,
+  onClick,
 }: {
+  texto: string;
   icono: string;
-  titulo: string;
-  ruta?: string;
   activo?: boolean;
+  onClick?: () => void;
 }) {
   return (
     <div
-      onClick={() => {
-        if (ruta) {
-          window.location.href = ruta;
-        }
-      }}
+      onClick={onClick}
       style={{
         display: "flex",
         alignItems: "center",
@@ -633,7 +565,9 @@ function MenuItem({
         background: activo
           ? "rgba(255,255,255,0.14)"
           : "transparent",
-        cursor: ruta ? "pointer" : "default",
+        cursor: onClick
+          ? "pointer"
+          : "default",
         fontSize: "14px",
         fontWeight: activo ? 700 : 500,
       }}
@@ -642,13 +576,12 @@ function MenuItem({
         style={{
           width: "22px",
           textAlign: "center",
-          fontSize: "16px",
         }}
       >
         {icono}
       </span>
 
-      {titulo}
+      {texto}
     </div>
   );
 }
@@ -665,67 +598,38 @@ function Tarjeta({
   icono: string;
 }) {
   return (
-    <div
-      style={{
-        background: "white",
-        borderRadius: "15px",
-        padding: "20px",
-        border: "1px solid #e0e8e2",
-        boxShadow:
-          "0 5px 18px rgba(26,72,45,0.05)",
-      }}
-    >
+    <div style={estilos.tarjeta}>
       <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          marginBottom: "15px",
-        }}
+        style={
+          estilos.tarjetaEncabezado
+        }
       >
         <span
-          style={{
-            color: "#718078",
-            fontSize: "13px",
-            fontWeight: 600,
-          }}
+          style={
+            estilos.tarjetaTitulo
+          }
         >
           {titulo}
         </span>
 
-        <span
-          style={{
-            width: "35px",
-            height: "35px",
-            borderRadius: "9px",
-            background: "#edf5ef",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
+        <div
+          style={estilos.iconoTarjeta}
         >
           {icono}
-        </span>
+        </div>
       </div>
 
-      <div
-        style={{
-          fontSize: "27px",
-          fontWeight: 800,
-          color: "#174c2e",
-        }}
+      <strong
+        style={estilos.tarjetaValor}
       >
         {valor}
-      </div>
+      </strong>
 
-      <div
-        style={{
-          marginTop: "6px",
-          color: "#9aa69e",
-          fontSize: "12px",
-        }}
+      <span
+        style={estilos.tarjetaDetalle}
       >
         {detalle}
-      </div>
+      </span>
     </div>
   );
 }
@@ -738,23 +642,8 @@ function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <div
-      style={{
-        background: "white",
-        borderRadius: "15px",
-        padding: "22px",
-        border: "1px solid #e0e8e2",
-        boxShadow:
-          "0 5px 18px rgba(26,72,45,0.04)",
-      }}
-    >
-      <h2
-        style={{
-          margin: "0 0 18px",
-          fontSize: "16px",
-          color: "#244b34",
-        }}
-      >
+    <div style={estilos.panel}>
+      <h2 style={estilos.panelTitulo}>
         {titulo}
       </h2>
 
@@ -763,38 +652,19 @@ function Panel({
   );
 }
 
-function Resumen({
-  etiqueta,
+function FilaDato({
+  texto,
   valor,
 }: {
-  etiqueta: string;
-  valor: string;
+  texto: string;
+  valor: string | number;
 }) {
   return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        background: "#f7faf7",
-        borderRadius: "9px",
-        padding: "12px 14px",
-      }}
-    >
-      <span
-        style={{
-          fontSize: "13px",
-          color: "#617268",
-        }}
-      >
-        {etiqueta}
-      </span>
+    <div style={estilos.filaDato}>
+      <span>{texto}</span>
 
       <strong
-        style={{
-          color: "#176b3a",
-          fontSize: "15px",
-        }}
+        style={estilos.numeroVerde}
       >
         {valor}
       </strong>
@@ -802,24 +672,228 @@ function Resumen({
   );
 }
 
-function Vacio({
-  texto,
-}: {
-  texto: string;
-}) {
-  return (
-    <div
-      style={{
-        minHeight: "190px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        color: "#91a097",
-        textAlign: "center",
-        fontSize: "13px",
-      }}
-    >
-      {texto}
-    </div>
-  );
-}
+const estilos: Record<
+  string,
+  React.CSSProperties
+> = {
+  pagina: {
+    minHeight: "100vh",
+    background: "#f4f7f3",
+    fontFamily: "Arial, sans-serif",
+    color: "#20352a",
+  },
+
+  cargando: {
+    minHeight: "100vh",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "#f4f7f3",
+    fontFamily: "Arial, sans-serif",
+    color: "#176b3a",
+    fontWeight: 700,
+  },
+
+  sidebar: {
+    position: "fixed",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: "235px",
+    background: "#103f28",
+    color: "white",
+    padding: "26px 18px",
+    boxSizing: "border-box",
+    overflowY: "auto",
+  },
+
+  logo: {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    marginBottom: "32px",
+    paddingLeft: "8px",
+  },
+
+  logoIcono: {
+    width: "44px",
+    height: "44px",
+    borderRadius: "12px",
+    background: "#1b7542",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "24px",
+  },
+
+  separador: {
+    height: "1px",
+    background:
+      "rgba(255,255,255,0.18)",
+    margin: "28px 0 18px",
+  },
+
+  cerrarSesion: {
+    width: "100%",
+    padding: "10px",
+    borderRadius: "9px",
+    border:
+      "1px solid rgba(255,255,255,0.35)",
+    background: "transparent",
+    color: "white",
+    cursor: "pointer",
+    fontWeight: 600,
+  },
+
+  contenido: {
+    marginLeft: "235px",
+    padding: "32px",
+  },
+
+  header: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: "28px",
+  },
+
+  titulo: {
+    margin: 0,
+    color: "#143e28",
+    fontSize: "28px",
+  },
+
+  subtitulo: {
+    margin: "7px 0 0",
+    color: "#718078",
+    fontSize: "14px",
+  },
+
+  operacion: {
+    background: "white",
+    border: "1px solid #e0e8e2",
+    borderRadius: "11px",
+    padding: "11px 16px",
+    fontSize: "13px",
+  },
+
+  tarjetas: {
+    display: "grid",
+    gridTemplateColumns:
+      "repeat(6, minmax(0, 1fr))",
+    gap: "18px",
+    marginBottom: "22px",
+  },
+
+  tarjeta: {
+    background: "white",
+    border: "1px solid #e0e8e2",
+    borderRadius: "14px",
+    padding: "18px",
+    minHeight: "108px",
+  },
+
+  tarjetaEncabezado: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "10px",
+    marginBottom: "14px",
+  },
+
+  tarjetaTitulo: {
+    color: "#718078",
+    fontSize: "13px",
+    fontWeight: 600,
+  },
+
+  iconoTarjeta: {
+    width: "34px",
+    height: "34px",
+    borderRadius: "9px",
+    background: "#edf4ef",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  tarjetaValor: {
+    display: "block",
+    color: "#176b3a",
+    fontSize: "26px",
+    marginBottom: "6px",
+  },
+
+  tarjetaDetalle: {
+    color: "#98a39c",
+    fontSize: "12px",
+  },
+
+  gridSuperior: {
+    display: "grid",
+    gridTemplateColumns: "2fr 1fr",
+    gap: "20px",
+    marginBottom: "20px",
+  },
+
+  gridInferior: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "20px",
+  },
+
+  panel: {
+    background: "white",
+    border: "1px solid #e0e8e2",
+    borderRadius: "15px",
+    padding: "22px",
+    minHeight: "180px",
+  },
+
+  panelTitulo: {
+    margin: "0 0 20px",
+    fontSize: "17px",
+    color: "#244b34",
+  },
+
+  filaResumen: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "13px 14px",
+    background: "#f7faf7",
+    borderRadius: "9px",
+    marginBottom: "9px",
+  },
+
+  detalleFila: {
+    color: "#8a978f",
+    fontSize: "11px",
+    marginTop: "5px",
+  },
+
+  numeroVerde: {
+    color: "#176b3a",
+  },
+
+  filaDato: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    background: "#f7faf7",
+    borderRadius: "8px",
+    padding: "12px 14px",
+    marginBottom: "10px",
+    fontSize: "13px",
+  },
+
+  vacio: {
+    minHeight: "130px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    textAlign: "center",
+    color: "#91a097",
+    fontSize: "14px",
+  },
+};
