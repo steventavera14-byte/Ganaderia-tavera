@@ -133,6 +133,7 @@ export default function FichaMaquinariaPage() {
 
   const [mostrarUsos, setMostrarUsos] = useState(false);
   const [mostrarFormularioUso, setMostrarFormularioUso] = useState(false);
+  const [mostrarCostos, setMostrarCostos] = useState(false);
 
   const [guardandoLectura, setGuardandoLectura] = useState(false);
   const [guardandoCombustible, setGuardandoCombustible] = useState(false);
@@ -1010,6 +1011,34 @@ export default function FichaMaquinariaPage() {
       (total, item) => total + Number(item.kilometros || 0),
       0
     );
+  }
+
+  function abrirCostos() {
+    setMostrarCostos(true);
+    setMensaje("");
+    setError("");
+  }
+
+  function cerrarCostos() {
+    setMostrarCostos(false);
+    setMensaje("");
+    setError("");
+  }
+
+  function costoOperativoTotal() {
+    return totalCostoCombustible() + totalCostoMantenimientos();
+  }
+
+  function costoPorHoraRegistrada() {
+    const horas = totalHorasUso();
+    if (horas <= 0) return null;
+    return costoOperativoTotal() / horas;
+  }
+
+  function costoPorKilometroRegistrado() {
+    const kilometros = totalKilometrosUso();
+    if (kilometros <= 0) return null;
+    return costoOperativoTotal() / kilometros;
   }
 
   function etiquetaEstado(estado: Maquinaria["estado"]) {
@@ -2333,6 +2362,88 @@ export default function FichaMaquinariaPage() {
               </section>
             )}
 
+            {mostrarCostos && (
+              <section className="panel panel-costos">
+                <div className="titulo-panel">
+                  <div>
+                    <div className="eyebrow">RESUMEN ECONÓMICO</div>
+                    <h2>Costos</h2>
+                    <p>
+                      Resumen automático de combustible y mantenimientos registrados
+                      para este equipo.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="boton-cerrar"
+                    onClick={cerrarCostos}
+                  >
+                    ×
+                  </button>
+                </div>
+
+                <div className="costos-resumen">
+                  <div>
+                    <span>Combustible</span>
+                    <strong>{formatearDinero(totalCostoCombustible())}</strong>
+                    <small>{formatearNumero(totalLitrosCombustible())} L registrados</small>
+                  </div>
+
+                  <div>
+                    <span>Mantenimientos</span>
+                    <strong>{formatearDinero(totalCostoMantenimientos())}</strong>
+                    <small>
+                      {mantenimientos.length}{" "}
+                      {mantenimientos.length === 1 ? "servicio" : "servicios"}
+                    </small>
+                  </div>
+
+                  <div className="costo-total">
+                    <span>Costo operativo total</span>
+                    <strong>{formatearDinero(costoOperativoTotal())}</strong>
+                    <small>Combustible + mantenimiento</small>
+                  </div>
+                </div>
+
+                <div className="costos-indicadores">
+                  <div>
+                    <span>Horas de trabajo registradas</span>
+                    <strong>{formatearNumero(totalHorasUso())} h</strong>
+                  </div>
+
+                  <div>
+                    <span>Costo por hora registrada</span>
+                    <strong>
+                      {costoPorHoraRegistrada() === null
+                        ? "—"
+                        : `${formatearDinero(costoPorHoraRegistrada())} / h`}
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>Kilómetros registrados</span>
+                    <strong>{formatearNumero(totalKilometrosUso())} km</strong>
+                  </div>
+
+                  <div>
+                    <span>Costo por kilómetro registrado</span>
+                    <strong>
+                      {costoPorKilometroRegistrado() === null
+                        ? "—"
+                        : `${formatearDinero(costoPorKilometroRegistrado())} / km`}
+                    </strong>
+                  </div>
+                </div>
+
+                <div className="nota-costos">
+                  <strong>Cómo se calcula:</strong> el costo operativo total usa únicamente
+                  los valores registrados en Combustible y Mantenimientos. El costo de
+                  compra del equipo no se incluye en este cálculo.
+                </div>
+              </section>
+            )}
+
             <section className="panel">
               <div className="titulo-panel">
                 <div>
@@ -2461,11 +2572,22 @@ export default function FichaMaquinariaPage() {
                   <span className="disponible">Abrir →</span>
                 </button>
 
-                <Modulo
-                  icono="$"
-                  titulo="Costos"
-                  descripcion="Resumen de combustible y mantenimiento."
-                />
+                <button
+                  type="button"
+                  className="modulo modulo-activo"
+                  onClick={abrirCostos}
+                >
+                  <div className="modulo-icono">$</div>
+
+                  <div className="modulo-texto">
+                    <strong>Costos</strong>
+                    <p>
+                      Total operativo: {formatearDinero(costoOperativoTotal())}
+                    </p>
+                  </div>
+
+                  <span className="disponible">Abrir →</span>
+                </button>
               </div>
             </section>
           </>
@@ -3515,6 +3637,79 @@ const estilos = `
     box-shadow: 0 0 0 3px rgba(60, 134, 86, 0.09);
   }
 
+  .panel-costos {
+    border-top: 4px solid #2d7545;
+  }
+
+  .costos-resumen {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    margin-bottom: 16px;
+  }
+
+  .costos-resumen > div,
+  .costos-indicadores > div {
+    background: #f4f8f5;
+    border: 1px solid #e0e9e2;
+    border-radius: 13px;
+    padding: 17px;
+  }
+
+  .costos-resumen span,
+  .costos-indicadores span {
+    display: block;
+    color: #738078;
+    font-size: 11px;
+    margin-bottom: 5px;
+  }
+
+  .costos-resumen strong {
+    display: block;
+    color: #173d27;
+    font-size: 22px;
+    overflow-wrap: anywhere;
+  }
+
+  .costos-resumen small {
+    display: block;
+    color: #7a857e;
+    font-size: 11px;
+    margin-top: 5px;
+  }
+
+  .costos-resumen .costo-total {
+    background: #edf6ef;
+    border-color: #cfe2d3;
+  }
+
+  .costos-indicadores {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .costos-indicadores strong {
+    color: #173d27;
+    font-size: 16px;
+    overflow-wrap: anywhere;
+  }
+
+  .nota-costos {
+    border: 1px solid #dce6de;
+    background: #fbfcfb;
+    border-radius: 11px;
+    padding: 13px 15px;
+    color: #66736a;
+    font-size: 12px;
+    line-height: 1.55;
+  }
+
+  .nota-costos strong {
+    color: #294b34;
+  }
+
   @media (max-width: 1100px) {
     .resumen {
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3667,11 +3862,23 @@ const estilos = `
       grid-template-columns: 1fr;
     }
 
+    .costos-resumen {
+      grid-template-columns: 1fr;
+    }
+
+    .costos-indicadores {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     .combustible-resumen .boton-principal,
     .mantenimiento-resumen .boton-principal,
     .servicios-resumen .boton-principal,
     .usos-resumen .boton-principal {
       grid-column: auto;
+    }
+
+    .costos-indicadores {
+      grid-template-columns: 1fr;
     }
 
     .campo-completo {
