@@ -23,6 +23,13 @@ type Trabajador = {
   created_at: string;
 };
 
+type DocumentoPendiente = {
+  id: string;
+  tipo: string;
+  archivo: File;
+  descripcion: string;
+};
+
 type ArchivoTrabajador = {
   id: string;
   finca_id: string;
@@ -100,6 +107,9 @@ export default function PersonalPage() {
   const [descripcionArchivo, setDescripcionArchivo] = useState("");
   const [archivoSeleccionado, setArchivoSeleccionado] =
     useState<File | null>(null);
+  const [documentosPendientes, setDocumentosPendientes] = useState<
+    DocumentoPendiente[]
+  >([]);
 
   const [error, setError] = useState("");
   const [mensaje, setMensaje] = useState("");
@@ -210,6 +220,7 @@ export default function PersonalPage() {
     setTipoArchivo("foto");
     setDescripcionArchivo("");
     setArchivoSeleccionado(null);
+    setDocumentosPendientes([]);
     setError("");
     setMensaje("");
     setMostrarFormulario(true);
@@ -235,6 +246,7 @@ export default function PersonalPage() {
     setTipoArchivo("foto");
     setDescripcionArchivo("");
     setArchivoSeleccionado(null);
+    setDocumentosPendientes([]);
     setError("");
     setMensaje("");
     setMostrarFormulario(true);
@@ -253,6 +265,7 @@ export default function PersonalPage() {
     setFormulario(formularioInicial);
     setArchivos([]);
     setArchivoSeleccionado(null);
+    setDocumentosPendientes([]);
     setDescripcionArchivo("");
     setError("");
   };
@@ -322,45 +335,62 @@ export default function PersonalPage() {
       return;
     }
 
-    const { error: errorGuardar } = await supabase
+    const { data: trabajadorCreado, error: errorGuardar } = await supabase
       .from("gan_trabajadores")
-      .insert(datos);
+      .insert(datos)
+      .select("id")
+      .single();
 
-    if (errorGuardar) {
-      setError(`Error al registrar trabajador: ${errorGuardar.message}`);
+    if (errorGuardar || !trabajadorCreado) {
+      setError(
+        `Error al registrar trabajador: ${
+          errorGuardar?.message || "No se pudo obtener el trabajador creado."
+        }`
+      );
       setGuardando(false);
       return;
     }
 
-    setMensaje("Trabajador registrado correctamente.");
+    let errorDocumentos = "";
+
+    for (const documento of documentosPendientes) {
+      const resultado = await subirArchivoParaTrabajador(
+        trabajadorCreado.id,
+        documento.tipo,
+        documento.archivo,
+        documento.descripcion
+      );
+
+      if (!resultado.ok) {
+        errorDocumentos = resultado.error || "Error al subir un documento.";
+        break;
+      }
+    }
 
     await cargarTrabajadores(fincaId);
 
+    if (errorDocumentos) {
+      setEditandoId(trabajadorCreado.id);
+      setDocumentosPendientes([]);
+      await cargarArchivos(trabajadorCreado.id);
+      setError(
+        `El trabajador fue registrado, pero hubo un problema con un documento: ${errorDocumentos}`
+      );
+      setGuardando(false);
+      return;
+    }
+
+    setMensaje("Trabajador y documentos registrados correctamente.");
     setMostrarFormulario(false);
     setEditandoId(null);
     setFormulario(formularioInicial);
+    setDocumentosPendientes([]);
     setGuardando(false);
   };
 
-  const subirDocumento = async () => {
-    setError("");
-    setMensaje("");
-
-    if (!editandoId) {
-      setError(
-        "Primero debes guardar al trabajador antes de agregar documentos."
-      );
-      return;
-    }
-
-    if (!archivoSeleccionado) {
-      setError("Selecciona un archivo.");
-      return;
-    }
-
-    if (archivoSeleccionado.size > 10 * 1024 * 1024) {
-      setError("El archivo no puede superar los 10 MB.");
-      return;
+  const validarArchivo = (archivo: File) => {
+    if (archivo.size > 10 * 1024 * 1024) {
+      return "El archivo no puede superar los 10 MB.";
     }
 
     const tiposPermitidos = [
@@ -370,57 +400,14 @@ export default function PersonalPage() {
       "application/pdf",
     ];
 
-    if (!tiposPermitidos.includes(archivoSeleccionado.type)) {
-      setError(
-        "Solo se permiten imágenes JPG, PNG, WEBP o documentos PDF."
-      );
-      return;
+    if (!tiposPermitidos.includes(archivo.type)) {
+      return "Solo se permiten imágenes JPG, PNG, WEBP o documentos PDF.";
     }
 
-    setSubiendoArchivo(true);
+    return "";
+  };
 
-    const extension =
-      archivoSeleccionado.name.split(".").pop()?.toLowerCase() || "archivo";
-
-    const nombreSeguro = `${tipoArchivo}-${Date.now()}.${extension}`;
-    const rutaStorage = `${fincaId}/${editandoId}/${nombreSeguro}`;
-
-    const { error: errorStorage } = await supabase.storage
-      .from("gan-personal")
-      .upload(rutaStorage, archivoSeleccionado, {
-        cacheControl: "3600",
-        upsert: false,
-        contentType: archivoSeleccionado.type,
-      });
-
-    if (errorStorage) {
-      setError(`Error al subir el archivo: ${errorStorage.message}`);
-      setSubiendoArchivo(false);
-      return;
-    }
-
-    const { error: errorRegistro } = await supabase
-      .from("gan_trabajador_archivos")
-      .insert({
-        finca_id: fincaId,
-        trabajador_id: editandoId,
-        tipo: tipoArchivo,
-        nombre_archivo: archivoSeleccionado.name,
-        ruta_storage: rutaStorage,
-        mime_type: archivoSeleccionado.type,
-        tamano_bytes: archivoSeleccionado.size,
-        descripcion: descripcionArchivo.trim() || null,
-        registrado_por: usuarioId,
-      });
-
-    if (errorRegistro) {
-      await supabase.storage.from("gan-personal").remove([rutaStorage]);
-
-      setError(`Error al registrar el documento: ${errorRegistro.message}`);
-      setSubiendoArchivo(false);
-      return;
-    }
-
+  const limpiarSelectorArchivo = () => {
     setArchivoSeleccionado(null);
     setDescripcionArchivo("");
     setTipoArchivo("foto");
@@ -429,12 +416,130 @@ export default function PersonalPage() {
       "archivo-personal"
     ) as HTMLInputElement | null;
 
-    if (input) {
-      input.value = "";
+    if (input) input.value = "";
+  };
+
+  const subirArchivoParaTrabajador = async (
+    trabajadorId: string,
+    tipo: string,
+    archivo: File,
+    descripcion: string
+  ): Promise<{ ok: boolean; error?: string }> => {
+    const errorValidacion = validarArchivo(archivo);
+
+    if (errorValidacion) {
+      return { ok: false, error: errorValidacion };
     }
 
-    await cargarArchivos(editandoId);
+    const extension = archivo.name.split(".").pop()?.toLowerCase() || "archivo";
+    const nombreSeguro = `${tipo}-${Date.now()}-${Math.random()
+      .toString(36)
+      .slice(2, 7)}.${extension}`;
+    const rutaStorage = `${fincaId}/${trabajadorId}/${nombreSeguro}`;
 
+    const { error: errorStorage } = await supabase.storage
+      .from("gan-personal")
+      .upload(rutaStorage, archivo, {
+        cacheControl: "3600",
+        upsert: false,
+        contentType: archivo.type,
+      });
+
+    if (errorStorage) {
+      return { ok: false, error: errorStorage.message };
+    }
+
+    const { error: errorRegistro } = await supabase
+      .from("gan_trabajador_archivos")
+      .insert({
+        finca_id: fincaId,
+        trabajador_id: trabajadorId,
+        tipo,
+        nombre_archivo: archivo.name,
+        ruta_storage: rutaStorage,
+        mime_type: archivo.type,
+        tamano_bytes: archivo.size,
+        descripcion: descripcion.trim() || null,
+        registrado_por: usuarioId,
+      });
+
+    if (errorRegistro) {
+      await supabase.storage.from("gan-personal").remove([rutaStorage]);
+      return { ok: false, error: errorRegistro.message };
+    }
+
+    return { ok: true };
+  };
+
+  const agregarDocumentoPendiente = () => {
+    setError("");
+    setMensaje("");
+
+    if (!archivoSeleccionado) {
+      setError("Selecciona un archivo.");
+      return;
+    }
+
+    const errorValidacion = validarArchivo(archivoSeleccionado);
+
+    if (errorValidacion) {
+      setError(errorValidacion);
+      return;
+    }
+
+    setDocumentosPendientes((anteriores) => [
+      ...anteriores,
+      {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        tipo: tipoArchivo,
+        archivo: archivoSeleccionado,
+        descripcion: descripcionArchivo.trim(),
+      },
+    ]);
+
+    limpiarSelectorArchivo();
+    setMensaje(
+      "Documento preparado. Se subirá cuando guardes al trabajador."
+    );
+  };
+
+  const eliminarDocumentoPendiente = (id: string) => {
+    setDocumentosPendientes((anteriores) =>
+      anteriores.filter((documento) => documento.id !== id)
+    );
+  };
+
+  const subirDocumento = async () => {
+    setError("");
+    setMensaje("");
+
+    if (!editandoId) {
+      agregarDocumentoPendiente();
+      return;
+    }
+
+    if (!archivoSeleccionado) {
+      setError("Selecciona un archivo.");
+      return;
+    }
+
+    setSubiendoArchivo(true);
+
+    const resultado = await subirArchivoParaTrabajador(
+      editandoId,
+      tipoArchivo,
+      archivoSeleccionado,
+      descripcionArchivo
+    );
+
+    if (!resultado.ok) {
+      setError(`Error al subir el archivo: ${resultado.error}`);
+      setSubiendoArchivo(false);
+      return;
+    }
+
+    limpiarSelectorArchivo();
+    await cargarArchivos(editandoId);
     setMensaje("Documento agregado correctamente.");
     setSubiendoArchivo(false);
   };
@@ -799,14 +904,14 @@ export default function PersonalPage() {
               </div>
             </section>
 
-            {editandoId && (
-              <section className="panel">
+            <section className="panel">
                 <div className="panel-header documentos-header">
                   <div>
                     <h2>Documentos del trabajador</h2>
                     <p>
-                      Foto, CI, licencia, contrato, certificados y otros
-                      documentos.
+                      {editandoId
+                        ? "Foto, CI, licencia, contrato, certificados y otros documentos."
+                        : "Agrega la foto, CI y otros documentos antes de guardar al trabajador."}
                     </p>
                   </div>
 
@@ -851,13 +956,17 @@ export default function PersonalPage() {
 
                   <div className="subir-contenedor">
                     <button
-                      onClick={subirDocumento}
+                      onClick={
+                        editandoId ? subirDocumento : agregarDocumentoPendiente
+                      }
                       className="btn-principal"
                       disabled={subiendoArchivo}
                     >
                       {subiendoArchivo
                         ? "Subiendo..."
-                        : "+ Agregar documento"}
+                        : editandoId
+                        ? "+ Agregar documento"
+                        : "+ Preparar documento"}
                     </button>
                   </div>
                 </div>
@@ -867,7 +976,52 @@ export default function PersonalPage() {
                   por archivo.
                 </div>
 
-                {archivos.length === 0 ? (
+                {!editandoId ? (
+                  documentosPendientes.length === 0 ? (
+                    <div className="vacio-documentos">
+                      <div className="vacio-icono">📁</div>
+                      <strong>No hay documentos preparados</strong>
+                      <span>
+                        Puedes agregar foto, CI anverso, CI reverso u otros
+                        documentos antes de guardar al trabajador.
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="documentos-pendientes">
+                      {documentosPendientes.map((documento) => (
+                        <div key={documento.id} className="documento-card">
+                          <div className="documento-top">
+                            <div>
+                              <strong>
+                                {etiquetaTipoArchivo(documento.tipo)}
+                              </strong>
+                              <span>{documento.archivo.name}</span>
+                            </div>
+
+                            <span className="documento-tamano">
+                              {mostrarTamano(documento.archivo.size)}
+                            </span>
+                          </div>
+
+                          {documento.descripcion && (
+                            <p>{documento.descripcion}</p>
+                          )}
+
+                          <div className="documento-botones documento-botones-unico">
+                            <button
+                              onClick={() =>
+                                eliminarDocumentoPendiente(documento.id)
+                              }
+                              className="btn-eliminar"
+                            >
+                              Quitar
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                ) : archivos.length === 0 ? (
                   <div className="vacio-documentos">
                     <div className="vacio-icono">📁</div>
                     <strong>No hay documentos registrados</strong>
@@ -899,33 +1053,24 @@ export default function PersonalPage() {
                                     {etiquetaTipoArchivo(archivo.tipo)}
                                   </strong>
                                 </td>
-
                                 <td>{archivo.nombre_archivo}</td>
                                 <td>{archivo.descripcion || "—"}</td>
-                                <td>
-                                  {mostrarTamano(archivo.tamano_bytes)}
-                                </td>
+                                <td>{mostrarTamano(archivo.tamano_bytes)}</td>
                                 <td>
                                   {new Date(
                                     archivo.created_at
                                   ).toLocaleDateString("es-BO")}
                                 </td>
-
                                 <td>
                                   <div className="acciones-archivo">
                                     <button
-                                      onClick={() =>
-                                        abrirDocumento(archivo)
-                                      }
+                                      onClick={() => abrirDocumento(archivo)}
                                       className="btn-ver"
                                     >
                                       Ver
                                     </button>
-
                                     <button
-                                      onClick={() =>
-                                        eliminarDocumento(archivo)
-                                      }
+                                      onClick={() => eliminarDocumento(archivo)}
                                       className="btn-eliminar"
                                     >
                                       Eliminar
@@ -941,10 +1086,7 @@ export default function PersonalPage() {
 
                     <div className="documentos-mobile">
                       {archivos.map((archivo) => (
-                        <div
-                          key={archivo.id}
-                          className="documento-card"
-                        >
+                        <div key={archivo.id} className="documento-card">
                           <div className="documento-top">
                             <div>
                               <strong>
@@ -958,14 +1100,12 @@ export default function PersonalPage() {
                             </span>
                           </div>
 
-                          {archivo.descripcion && (
-                            <p>{archivo.descripcion}</p>
-                          )}
+                          {archivo.descripcion && <p>{archivo.descripcion}</p>}
 
                           <small>
-                            {new Date(
-                              archivo.created_at
-                            ).toLocaleDateString("es-BO")}
+                            {new Date(archivo.created_at).toLocaleDateString(
+                              "es-BO"
+                            )}
                           </small>
 
                           <div className="documento-botones">
@@ -975,11 +1115,8 @@ export default function PersonalPage() {
                             >
                               Ver
                             </button>
-
                             <button
-                              onClick={() =>
-                                eliminarDocumento(archivo)
-                              }
+                              onClick={() => eliminarDocumento(archivo)}
                               className="btn-eliminar"
                             >
                               Eliminar
@@ -991,7 +1128,6 @@ export default function PersonalPage() {
                   </>
                 )}
               </section>
-            )}
           </>
         )}
 
@@ -1595,6 +1731,18 @@ export default function PersonalPage() {
           display: none;
         }
 
+        .documentos-pendientes {
+          padding: 12px 22px 22px;
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 10px;
+          border-top: 1px solid #edf1ee;
+        }
+
+        .documento-botones-unico {
+          grid-template-columns: 1fr;
+        }
+
         /* ===========================
            TABLET
         =========================== */
@@ -1902,6 +2050,11 @@ export default function PersonalPage() {
           .documentos-mobile {
             padding: 12px;
             border-top: 1px solid #edf1ee;
+          }
+
+          .documentos-pendientes {
+            padding: 12px;
+            grid-template-columns: 1fr;
           }
 
           .documento-card {
