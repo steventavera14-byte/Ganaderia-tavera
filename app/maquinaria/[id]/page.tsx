@@ -24,6 +24,16 @@ type Maquinaria = {
   created_at: string;
 };
 
+type Lectura = {
+  id: string;
+  maquinaria_id: string;
+  fecha: string;
+  lectura: number;
+  observaciones: string | null;
+  registrado_por: string | null;
+  created_at: string;
+};
+
 export default function FichaMaquinariaPage() {
   const router = useRouter();
   const params = useParams();
@@ -34,7 +44,22 @@ export default function FichaMaquinariaPage() {
 
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
+  const [mensaje, setMensaje] = useState("");
+
   const [maquina, setMaquina] = useState<Maquinaria | null>(null);
+  const [lecturas, setLecturas] = useState<Lectura[]>([]);
+
+  const [mostrarLecturas, setMostrarLecturas] = useState(false);
+  const [mostrarFormularioLectura, setMostrarFormularioLectura] =
+    useState(false);
+
+  const [guardandoLectura, setGuardandoLectura] = useState(false);
+
+  const [fechaLectura, setFechaLectura] = useState(
+    new Date().toISOString().split("T")[0]
+  );
+  const [nuevaLectura, setNuevaLectura] = useState("");
+  const [observacionLectura, setObservacionLectura] = useState("");
 
   useEffect(() => {
     if (maquinaId) {
@@ -76,24 +101,8 @@ export default function FichaMaquinariaPage() {
         return;
       }
 
-      const { data, error: errorMaquina } = await supabase
-        .from("gan_maquinaria")
-        .select("*")
-        .eq("id", maquinaId)
-        .eq("finca_id", membresia.finca_id)
-        .maybeSingle();
-
-      if (errorMaquina) {
-        throw errorMaquina;
-      }
-
-      if (!data) {
-        setError("No se encontró esta maquinaria.");
-        setMaquina(null);
-        return;
-      }
-
-      setMaquina(data as Maquinaria);
+      await cargarMaquina(membresia.finca_id);
+      await cargarLecturas();
     } catch (err: any) {
       console.error(err);
       setError(
@@ -101,6 +110,141 @@ export default function FichaMaquinariaPage() {
       );
     } finally {
       setCargando(false);
+    }
+  }
+
+  async function cargarMaquina(fincaId?: string) {
+    if (!maquinaId) return;
+
+    let consulta = supabase
+      .from("gan_maquinaria")
+      .select("*")
+      .eq("id", maquinaId);
+
+    if (fincaId) {
+      consulta = consulta.eq("finca_id", fincaId);
+    }
+
+    const { data, error: errorMaquina } =
+      await consulta.maybeSingle();
+
+    if (errorMaquina) {
+      throw errorMaquina;
+    }
+
+    if (!data) {
+      setError("No se encontró esta maquinaria.");
+      setMaquina(null);
+      return;
+    }
+
+    setMaquina(data as Maquinaria);
+  }
+
+  async function cargarLecturas() {
+    if (!maquinaId) return;
+
+    const { data, error: errorLecturas } = await supabase
+      .from("gan_maquinaria_lecturas")
+      .select("*")
+      .eq("maquinaria_id", maquinaId)
+      .order("fecha", { ascending: false })
+      .order("created_at", { ascending: false });
+
+    if (errorLecturas) {
+      throw errorLecturas;
+    }
+
+    setLecturas((data || []) as Lectura[]);
+  }
+
+  function abrirLecturas() {
+    setMostrarLecturas(true);
+    setMostrarFormularioLectura(false);
+    setMensaje("");
+    setError("");
+  }
+
+  function cerrarLecturas() {
+    setMostrarLecturas(false);
+    setMostrarFormularioLectura(false);
+    setMensaje("");
+    setError("");
+  }
+
+  function abrirNuevaLectura() {
+    if (!maquina) return;
+
+    setFechaLectura(new Date().toISOString().split("T")[0]);
+    setNuevaLectura("");
+    setObservacionLectura("");
+    setError("");
+    setMensaje("");
+    setMostrarFormularioLectura(true);
+  }
+
+  async function registrarLectura(e: React.FormEvent) {
+    e.preventDefault();
+
+    if (!maquina || !maquinaId) return;
+
+    const valor = Number(nuevaLectura);
+
+    if (!fechaLectura) {
+      setError("Selecciona la fecha de la lectura.");
+      return;
+    }
+
+    if (!nuevaLectura.trim() || Number.isNaN(valor)) {
+      setError("Ingresa una lectura válida.");
+      return;
+    }
+
+    if (valor < Number(maquina.lectura_actual || 0)) {
+      setError(
+        `La nueva lectura no puede ser menor que ${Number(
+          maquina.lectura_actual || 0
+        ).toLocaleString("es-BO")} ${
+          maquina.tipo_medicion === "horas" ? "h" : "km"
+        }.`
+      );
+      return;
+    }
+
+    try {
+      setGuardandoLectura(true);
+      setError("");
+      setMensaje("");
+
+      const { error: errorRpc } = await supabase.rpc(
+        "gan_registrar_lectura_maquinaria",
+        {
+          p_maquinaria_id: maquinaId,
+          p_fecha: fechaLectura,
+          p_lectura: valor,
+          p_observaciones: observacionLectura.trim() || null,
+        }
+      );
+
+      if (errorRpc) {
+        throw errorRpc;
+      }
+
+      await cargarMaquina();
+      await cargarLecturas();
+
+      setNuevaLectura("");
+      setObservacionLectura("");
+      setMostrarFormularioLectura(false);
+
+      setMensaje("Lectura registrada correctamente.");
+    } catch (err: any) {
+      console.error(err);
+      setError(
+        err?.message || "No se pudo registrar la lectura."
+      );
+    } finally {
+      setGuardandoLectura(false);
     }
   }
 
@@ -146,17 +290,23 @@ export default function FichaMaquinariaPage() {
     return "Sin medición";
   }
 
+  function unidadLectura() {
+    if (!maquina) return "";
+
+    if (maquina.tipo_medicion === "horas") return "h";
+    if (maquina.tipo_medicion === "km") return "km";
+
+    return "";
+  }
+
   function valorLectura() {
     if (!maquina || maquina.tipo_medicion === "ninguno") {
       return "—";
     }
 
-    const unidad =
-      maquina.tipo_medicion === "horas" ? "h" : "km";
-
     return `${Number(
       maquina.lectura_actual || 0
-    ).toLocaleString("es-BO")} ${unidad}`;
+    ).toLocaleString("es-BO")} ${unidadLectura()}`;
   }
 
   function formatearFecha(fecha: string | null) {
@@ -208,6 +358,7 @@ export default function FichaMaquinariaPage() {
         </button>
 
         {error && <div className="alerta error">{error}</div>}
+        {mensaje && <div className="alerta exito">{mensaje}</div>}
 
         {maquina && (
           <>
@@ -287,10 +438,7 @@ export default function FichaMaquinariaPage() {
               </div>
 
               <div className="datos-grid">
-                <Dato
-                  titulo="Nombre"
-                  valor={maquina.nombre}
-                />
+                <Dato titulo="Nombre" valor={maquina.nombre} />
 
                 <Dato
                   titulo="Tipo"
@@ -362,6 +510,193 @@ export default function FichaMaquinariaPage() {
               )}
             </section>
 
+            {mostrarLecturas && (
+              <section className="panel panel-lecturas">
+                <div className="titulo-panel">
+                  <div>
+                    <div className="eyebrow">
+                      CONTROL DE LECTURAS
+                    </div>
+
+                    <h2>
+                      {maquina.tipo_medicion === "horas"
+                        ? "Horómetro"
+                        : "Kilometraje"}
+                    </h2>
+
+                    <p>
+                      Historial de lecturas registradas para este
+                      equipo.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="boton-cerrar"
+                    onClick={cerrarLecturas}
+                  >
+                    ×
+                  </button>
+                </div>
+
+                <div className="lectura-actual-box">
+                  <div>
+                    <span>Lectura actual</span>
+                    <strong>{valorLectura()}</strong>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="boton-principal"
+                    onClick={abrirNuevaLectura}
+                  >
+                    + Registrar lectura
+                  </button>
+                </div>
+
+                {mostrarFormularioLectura && (
+                  <form
+                    className="form-lectura"
+                    onSubmit={registrarLectura}
+                  >
+                    <div className="form-lectura-grid">
+                      <label>
+                        <span>Fecha *</span>
+                        <input
+                          type="date"
+                          value={fechaLectura}
+                          onChange={(e) =>
+                            setFechaLectura(e.target.value)
+                          }
+                          required
+                        />
+                      </label>
+
+                      <label>
+                        <span>
+                          {maquina.tipo_medicion === "horas"
+                            ? "Lectura del horómetro *"
+                            : "Kilometraje *"}
+                        </span>
+
+                        <div className="input-unidad">
+                          <input
+                            type="number"
+                            min={Number(
+                              maquina.lectura_actual || 0
+                            )}
+                            step="0.01"
+                            inputMode="decimal"
+                            value={nuevaLectura}
+                            onChange={(e) =>
+                              setNuevaLectura(e.target.value)
+                            }
+                            placeholder={String(
+                              maquina.lectura_actual || 0
+                            )}
+                            required
+                          />
+
+                          <span>{unidadLectura()}</span>
+                        </div>
+                      </label>
+
+                      <label className="campo-completo">
+                        <span>Observación</span>
+                        <textarea
+                          value={observacionLectura}
+                          onChange={(e) =>
+                            setObservacionLectura(e.target.value)
+                          }
+                          placeholder="Ej. Lectura tomada al finalizar la jornada."
+                          rows={3}
+                        />
+                      </label>
+                    </div>
+
+                    <div className="acciones-form">
+                      <button
+                        type="button"
+                        className="boton-secundario"
+                        onClick={() =>
+                          setMostrarFormularioLectura(false)
+                        }
+                        disabled={guardandoLectura}
+                      >
+                        Cancelar
+                      </button>
+
+                      <button
+                        type="submit"
+                        className="boton-principal"
+                        disabled={guardandoLectura}
+                      >
+                        {guardandoLectura
+                          ? "Guardando..."
+                          : "Guardar lectura"}
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                <div className="historial-cabecera">
+                  <h3>Historial de lecturas</h3>
+                  <span>
+                    {lecturas.length}{" "}
+                    {lecturas.length === 1
+                      ? "registro"
+                      : "registros"}
+                  </span>
+                </div>
+
+                {lecturas.length === 0 ? (
+                  <div className="sin-lecturas">
+                    <div>⏱️</div>
+                    <strong>No hay lecturas registradas todavía</strong>
+                    <p>
+                      La lectura inicial del equipo es{" "}
+                      <b>{valorLectura()}</b>.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="tabla-contenedor">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Fecha</th>
+                          <th>Lectura</th>
+                          <th>Observación</th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        {lecturas.map((lectura) => (
+                          <tr key={lectura.id}>
+                            <td data-label="Fecha">
+                              {formatearFecha(lectura.fecha)}
+                            </td>
+
+                            <td data-label="Lectura">
+                              <strong>
+                                {Number(
+                                  lectura.lectura
+                                ).toLocaleString("es-BO")}{" "}
+                                {unidadLectura()}
+                              </strong>
+                            </td>
+
+                            <td data-label="Observación">
+                              {lectura.observaciones || "—"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </section>
+            )}
+
             <section className="panel">
               <div className="titulo-panel">
                 <div>
@@ -379,11 +714,32 @@ export default function FichaMaquinariaPage() {
               </div>
 
               <div className="modulos-grid">
-                <Modulo
-                  icono="⏱️"
-                  titulo="Horómetro / lecturas"
-                  descripcion="Historial de horas o kilómetros."
-                />
+                <button
+                  type="button"
+                  className="modulo modulo-activo"
+                  onClick={abrirLecturas}
+                  disabled={maquina.tipo_medicion === "ninguno"}
+                >
+                  <div className="modulo-icono">⏱️</div>
+
+                  <div className="modulo-texto">
+                    <strong>Horómetro / lecturas</strong>
+
+                    <p>
+                      {maquina.tipo_medicion === "ninguno"
+                        ? "Este equipo no utiliza control por horas o kilómetros."
+                        : `Actual: ${valorLectura()} · ${lecturas.length} ${
+                            lecturas.length === 1
+                              ? "registro"
+                              : "registros"
+                          }`}
+                    </p>
+                  </div>
+
+                  {maquina.tipo_medicion !== "ninguno" && (
+                    <span className="disponible">Abrir →</span>
+                  )}
+                </button>
 
                 <Modulo
                   icono="⛽"
@@ -473,8 +829,8 @@ function Modulo({
   descripcion: string;
 }) {
   return (
-    <div className="modulo">
-      <div className="modulo-icono">{icono}</div>
+    <div className="modulo-estatico">
+      <div className="modulo-icono-estatico">{icono}</div>
 
       <div>
         <strong>{titulo}</strong>
@@ -484,7 +840,7 @@ function Modulo({
       <span className="proximamente">Próximamente</span>
 
       <style jsx>{`
-        .modulo {
+        .modulo-estatico {
           position: relative;
           display: flex;
           align-items: flex-start;
@@ -497,7 +853,7 @@ function Modulo({
           box-sizing: border-box;
         }
 
-        .modulo-icono {
+        .modulo-icono-estatico {
           width: 42px;
           height: 42px;
           flex: 0 0 42px;
@@ -693,6 +1049,10 @@ const estilos = `
     box-shadow: 0 3px 14px rgba(20, 50, 29, 0.04);
   }
 
+  .panel-lecturas {
+    border-top: 4px solid #2d7545;
+  }
+
   .titulo-panel {
     display: flex;
     align-items: flex-start;
@@ -721,7 +1081,8 @@ const estilos = `
     font-size: 13px;
   }
 
-  .boton-editar {
+  .boton-editar,
+  .boton-secundario {
     flex-shrink: 0;
     border: 1px solid #cbd8ce;
     background: white;
@@ -731,6 +1092,37 @@ const estilos = `
     font-size: 12px;
     font-weight: 750;
     cursor: pointer;
+  }
+
+  .boton-cerrar {
+    width: 36px;
+    height: 36px;
+    flex: 0 0 36px;
+    border-radius: 50%;
+    border: 1px solid #d9e1da;
+    background: white;
+    color: #526157;
+    font-size: 23px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .boton-principal {
+    border: none;
+    background: #1f6b3a;
+    color: white;
+    padding: 11px 16px;
+    border-radius: 9px;
+    font-weight: 750;
+    font-size: 12px;
+    cursor: pointer;
+    min-height: 40px;
+  }
+
+  .boton-principal:disabled,
+  .boton-secundario:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 
   .datos-grid {
@@ -766,6 +1158,263 @@ const estilos = `
     gap: 12px;
   }
 
+  .modulo {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    min-height: 88px;
+    padding: 16px;
+    border: 1px solid #d8e4da;
+    border-radius: 13px;
+    background: white;
+    box-sizing: border-box;
+    width: 100%;
+    text-align: left;
+    font-family: inherit;
+  }
+
+  .modulo-activo {
+    cursor: pointer;
+  }
+
+  .modulo-activo:hover {
+    background: #f7fbf8;
+    border-color: #b9d1bf;
+  }
+
+  .modulo-activo:disabled {
+    cursor: default;
+    opacity: 0.65;
+  }
+
+  .modulo-icono {
+    width: 42px;
+    height: 42px;
+    flex: 0 0 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 11px;
+    background: #eaf4ed;
+    font-size: 20px;
+  }
+
+  .modulo-texto {
+    min-width: 0;
+  }
+
+  .modulo-texto strong {
+    display: block;
+    padding-right: 60px;
+    color: #20452e;
+    font-size: 14px;
+  }
+
+  .modulo-texto p {
+    margin: 5px 0 0;
+    color: #758078;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  .disponible {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    color: #2b6940;
+    font-size: 10px;
+    font-weight: 800;
+  }
+
+  .lectura-actual-box {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    background: #f4f8f5;
+    border: 1px solid #e0e9e2;
+    border-radius: 13px;
+    padding: 17px;
+    margin-bottom: 17px;
+  }
+
+  .lectura-actual-box span {
+    display: block;
+    color: #738078;
+    font-size: 11px;
+  }
+
+  .lectura-actual-box strong {
+    display: block;
+    color: #173d27;
+    font-size: 25px;
+    margin-top: 4px;
+  }
+
+  .form-lectura {
+    border: 1px solid #dce6de;
+    background: #fbfcfb;
+    border-radius: 13px;
+    padding: 17px;
+    margin-bottom: 20px;
+  }
+
+  .form-lectura-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .form-lectura label {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .form-lectura label > span {
+    color: #405046;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .form-lectura input,
+  .form-lectura textarea {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #ccd6ce;
+    border-radius: 9px;
+    background: white;
+    color: #1e2e23;
+    padding: 10px 11px;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+  }
+
+  .form-lectura input {
+    min-height: 42px;
+  }
+
+  .form-lectura textarea {
+    resize: vertical;
+  }
+
+  .form-lectura input:focus,
+  .form-lectura textarea:focus {
+    border-color: #3c8656;
+    box-shadow: 0 0 0 3px rgba(60, 134, 86, 0.09);
+  }
+
+  .campo-completo {
+    grid-column: 1 / -1;
+  }
+
+  .input-unidad {
+    display: flex;
+    align-items: center;
+    position: relative;
+  }
+
+  .input-unidad input {
+    padding-right: 50px;
+  }
+
+  .input-unidad > span {
+    position: absolute;
+    right: 12px;
+    color: #66746b;
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .acciones-form {
+    display: flex;
+    justify-content: flex-end;
+    gap: 9px;
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #e8ede9;
+  }
+
+  .historial-cabecera {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 22px 0 11px;
+  }
+
+  .historial-cabecera h3 {
+    margin: 0;
+    color: #294333;
+    font-size: 15px;
+  }
+
+  .historial-cabecera span {
+    background: #eef4ef;
+    color: #52705c;
+    border-radius: 999px;
+    padding: 5px 8px;
+    font-size: 10px;
+    font-weight: 750;
+  }
+
+  .sin-lecturas {
+    text-align: center;
+    padding: 30px 15px;
+    border: 1px dashed #d8e2da;
+    border-radius: 12px;
+    color: #758078;
+  }
+
+  .sin-lecturas > div {
+    font-size: 30px;
+    margin-bottom: 7px;
+  }
+
+  .sin-lecturas strong {
+    display: block;
+    color: #405448;
+    font-size: 13px;
+  }
+
+  .sin-lecturas p {
+    margin: 6px 0 0;
+    font-size: 12px;
+  }
+
+  .tabla-contenedor {
+    overflow-x: auto;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  th {
+    text-align: left;
+    color: #6f7c73;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 10px;
+    border-bottom: 1px solid #dfe6e0;
+  }
+
+  td {
+    padding: 12px 10px;
+    border-bottom: 1px solid #edf1ed;
+    color: #526058;
+    vertical-align: top;
+  }
+
+  td strong {
+    color: #244d32;
+  }
+
   .alerta {
     padding: 13px 15px;
     border-radius: 10px;
@@ -778,6 +1427,12 @@ const estilos = `
     background: #fff0f0;
     color: #9c2929;
     border: 1px solid #f2cccc;
+  }
+
+  .alerta.exito {
+    background: #edf8f0;
+    color: #24633a;
+    border: 1px solid #cfe7d5;
   }
 
   .cargando {
@@ -894,6 +1549,85 @@ const estilos = `
       font-size: 11px;
       padding: 8px 10px;
     }
+
+    .lectura-actual-box {
+      padding: 14px;
+    }
+
+    .lectura-actual-box strong {
+      font-size: 21px;
+    }
+  }
+
+  @media (max-width: 600px) {
+    .form-lectura-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .campo-completo {
+      grid-column: auto;
+    }
+
+    .lectura-actual-box {
+      display: block;
+    }
+
+    .lectura-actual-box .boton-principal {
+      width: 100%;
+      margin-top: 13px;
+    }
+
+    .acciones-form {
+      display: grid;
+      grid-template-columns: 1fr;
+    }
+
+    .acciones-form button {
+      width: 100%;
+      min-height: 42px;
+    }
+
+    .acciones-form .boton-principal {
+      grid-row: 1;
+    }
+
+    table,
+    thead,
+    tbody,
+    tr,
+    th,
+    td {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    thead {
+      display: none;
+    }
+
+    tr {
+      border: 1px solid #e0e7e1;
+      border-radius: 10px;
+      padding: 10px;
+      margin-bottom: 9px;
+      background: #fafbfa;
+    }
+
+    td {
+      display: grid;
+      grid-template-columns: 90px 1fr;
+      gap: 8px;
+      padding: 5px 0;
+      border: none;
+    }
+
+    td::before {
+      content: attr(data-label);
+      color: #7a867e;
+      font-size: 10px;
+      font-weight: 700;
+    }
   }
 
   @media (max-width: 430px) {
@@ -918,6 +1652,16 @@ const estilos = `
 
     .boton-editar {
       width: 100%;
+    }
+
+    .modulo-texto strong {
+      padding-right: 0;
+      padding-top: 19px;
+    }
+
+    .disponible {
+      left: 70px;
+      right: auto;
     }
   }
 `;
