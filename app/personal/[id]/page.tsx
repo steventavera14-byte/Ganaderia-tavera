@@ -104,6 +104,7 @@ export default function KardexTrabajadorPage() {
   const [error, setError] = useState("");
   const [trabajador, setTrabajador] = useState<Trabajador | null>(null);
   const [archivos, setArchivos] = useState<Archivo[]>([]);
+  const [fotoUrl, setFotoUrl] = useState("");
   const [pagos, setPagos] = useState<RegistroFlexible[]>([]);
   const [costos, setCostos] = useState<RegistroFlexible[]>([]);
   const [asignaciones, setAsignaciones] = useState<RegistroFlexible[]>([]);
@@ -179,7 +180,23 @@ export default function KardexTrabajadorPage() {
         .order("created_at", { ascending: false }),
     ]);
 
-    setArchivos((resultados[0].data || []) as Archivo[]);
+    const archivosCargados = (resultados[0].data || []) as Archivo[];
+    setArchivos(archivosCargados);
+
+    const fotoTrabajador = archivosCargados.find(
+      (archivo) => archivo.tipo === "foto"
+    );
+
+    if (fotoTrabajador) {
+      const { data: fotoFirmada } = await supabase.storage
+        .from("gan-personal")
+        .createSignedUrl(fotoTrabajador.ruta_storage, 3600);
+
+      setFotoUrl(fotoFirmada?.signedUrl || "");
+    } else {
+      setFotoUrl("");
+    }
+
     setPagos((resultados[1].data || []) as RegistroFlexible[]);
     setCostos((resultados[2].data || []) as RegistroFlexible[]);
     setAsignaciones((resultados[3].data || []) as RegistroFlexible[]);
@@ -283,7 +300,15 @@ export default function KardexTrabajadorPage() {
 
         <section className="cabecera-kardex">
           <div className="avatar-grande">
-            {trabajador.nombre?.charAt(0).toUpperCase()}
+            {fotoUrl ? (
+              <img
+                src={fotoUrl}
+                alt={`Foto de ${nombreCompleto}`}
+                className="foto-trabajador"
+              />
+            ) : (
+              trabajador.nombre?.charAt(0).toUpperCase()
+            )}
           </div>
           <div className="identidad">
             <span className="sobrelinea">KARDEX DEL TRABAJADOR</span>
@@ -568,6 +593,13 @@ function Estilos() {
         width: 68px; height: 68px; min-width: 68px; border-radius: 50%;
         background: #e7f3eb; color: #176b3a; display: flex; align-items: center;
         justify-content: center; font-size: 28px; font-weight: 800;
+      }
+      .foto-trabajador {
+        width: 100%;
+        height: 100%;
+        display: block;
+        object-fit: cover;
+        border-radius: 50%;
       }
       .sobrelinea { font-size: 10px; letter-spacing: .12em; color: #7b8d82; font-weight: 800; }
       .identidad h1 { margin: 5px 0 7px; font-size: 27px; color: #174c2e; }
