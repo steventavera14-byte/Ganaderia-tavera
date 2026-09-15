@@ -103,6 +103,8 @@ export default function KardexTrabajadorPage() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
   const [trabajador, setTrabajador] = useState<Trabajador | null>(null);
+  const [fincaId, setFincaId] = useState("");
+  const [usuarioId, setUsuarioId] = useState("");
   const [archivos, setArchivos] = useState<Archivo[]>([]);
   const [fotoUrl, setFotoUrl] = useState("");
   const [pagos, setPagos] = useState<RegistroFlexible[]>([]);
@@ -110,6 +112,8 @@ export default function KardexTrabajadorPage() {
   const [asignaciones, setAsignaciones] = useState<RegistroFlexible[]>([]);
   const [mostrarPago, setMostrarPago] = useState(false);
   const [guardandoPago, setGuardandoPago] = useState(false);
+  const [comprobante, setComprobante] = useState<File | null>(null);
+  const [comprobantesPago, setComprobantesPago] = useState<Record<string, RegistroFlexible[]>>({});
   const [mensaje, setMensaje] = useState("");
   const [pago, setPago] = useState({
     fecha_pago: new Date().toISOString().slice(0, 10),
@@ -153,6 +157,9 @@ export default function KardexTrabajadorPage() {
       router.replace("/");
       return;
     }
+
+    setUsuarioId(user.id);
+    setFincaId(membresia.finca_id);
 
     const { data: persona, error: errorPersona } = await supabase
       .from("gan_trabajadores")
@@ -219,7 +226,28 @@ export default function KardexTrabajadorPage() {
       setFotoUrl("");
     }
 
-    setPagos((resultados[1].data || []) as RegistroFlexible[]);
+    const pagosCargados = (resultados[1].data || []) as RegistroFlexible[];
+    setPagos(pagosCargados);
+
+    if (pagosCargados.length > 0) {
+      const idsPagos = pagosCargados.map((item) => String(item.id));
+      const { data: archivosPago } = await supabase
+        .from("gan_pago_personal_archivos")
+        .select("*")
+        .in("pago_id", idsPagos)
+        .order("created_at", { ascending: false });
+
+      const agrupados: Record<string, RegistroFlexible[]> = {};
+      for (const archivo of (archivosPago || []) as RegistroFlexible[]) {
+        const pagoId = String(archivo.pago_id);
+        if (!agrupados[pagoId]) agrupados[pagoId] = [];
+        agrupados[pagoId].push(archivo);
+      }
+      setComprobantesPago(agrupados);
+    } else {
+      setComprobantesPago({});
+    }
+
     setCostos((resultados[2].data || []) as RegistroFlexible[]);
     setAsignaciones((resultados[3].data || []) as RegistroFlexible[]);
 
@@ -285,7 +313,7 @@ export default function KardexTrabajadorPage() {
 
     setGuardandoPago(true);
 
-    const { error: errorPago } = await supabase.rpc(
+    const { data: pagoCreado, error: errorPago } = await supabase.rpc(
       "gan_registrar_pago_personal",
       {
         p_trabajador_id: trabajador.id,
@@ -303,10 +331,59 @@ export default function KardexTrabajadorPage() {
       }
     );
 
-    if (errorPago) {
-      setError(`No se pudo registrar el pago: ${errorPago.message}`);
+    if (errorPago || !pagoCreado) {
+      setError(`No se pudo registrar el pago: ${errorPago?.message || "No se obtuvo el ID del pago."}`);
       setGuardandoPago(false);
       return;
+    }
+
+    let errorComprobante = "";
+
+    if (comprobante) {
+      const permitidos = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+      if (!permitidos.includes(comprobante.type)) {
+        setError("El pago fue registrado, pero el comprobante no se subió: formato no permitido.");
+        setGuardandoPago(false);
+        return;
+      }
+      if (comprobante.size > 10 * 1024 * 1024) {
+        setError("El pago fue registrado, pero el comprobante no se subió: supera los 10 MB.");
+        setGuardandoPago(false);
+        return;
+      }
+
+      const extension = comprobante.name.split(".").pop()?.toLowerCase() || "archivo";
+      const nombreSeguro = `comprobante-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${extension}`;
+      const ruta = `${fincaId}/${trabajador.id}/${pagoCreado}/${nombreSeguro}`;
+
+      const { error: errorStorage } = await supabase.storage
+        .from("gan-pagos-personal")
+        .upload(ruta, comprobante, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: comprobante.type,
+        });
+
+      if (errorStorage) {
+        errorComprobante = errorStorage.message;
+      } else {
+        const { error: errorRegistroArchivo } = await supabase
+          .from("gan_pago_personal_archivos")
+          .insert({
+            pago_id: pagoCreado,
+            finca_id: fincaId,
+            nombre_archivo: comprobante.name,
+            ruta_storage: ruta,
+            mime_type: comprobante.type,
+            tamano_bytes: comprobante.size,
+            registrado_por: usuarioId,
+          });
+
+        if (errorRegistroArchivo) {
+          await supabase.storage.from("gan-pagos-personal").remove([ruta]);
+          errorComprobante = errorRegistroArchivo.message;
+        }
+      }
     }
 
     const { data: pagosActualizados, error: errorRecarga } = await supabase
@@ -318,8 +395,31 @@ export default function KardexTrabajadorPage() {
     if (errorRecarga) {
       setError(`El pago fue registrado, pero no se pudo actualizar el historial: ${errorRecarga.message}`);
     } else {
-      setPagos((pagosActualizados || []) as RegistroFlexible[]);
-      setMensaje("Pago registrado correctamente.");
+      const nuevosPagos = (pagosActualizados || []) as RegistroFlexible[];
+      setPagos(nuevosPagos);
+
+      const idsPagos = nuevosPagos.map((item) => String(item.id));
+      if (idsPagos.length > 0) {
+        const { data: archivosPago } = await supabase
+          .from("gan_pago_personal_archivos")
+          .select("*")
+          .in("pago_id", idsPagos)
+          .order("created_at", { ascending: false });
+
+        const agrupados: Record<string, RegistroFlexible[]> = {};
+        for (const archivo of (archivosPago || []) as RegistroFlexible[]) {
+          const pagoId = String(archivo.pago_id);
+          if (!agrupados[pagoId]) agrupados[pagoId] = [];
+          agrupados[pagoId].push(archivo);
+        }
+        setComprobantesPago(agrupados);
+      }
+
+      if (errorComprobante) {
+        setError(`El pago fue registrado, pero hubo un problema con el comprobante: ${errorComprobante}`);
+      } else {
+        setMensaje(comprobante ? "Pago y comprobante registrados correctamente." : "Pago registrado correctamente.");
+      }
     }
 
     setPago({
@@ -335,8 +435,26 @@ export default function KardexTrabajadorPage() {
       metodo_pago: "",
       observaciones: "",
     });
+    setComprobante(null);
+    const inputComprobante = document.getElementById("comprobante-pago") as HTMLInputElement | null;
+    if (inputComprobante) inputComprobante.value = "";
     setMostrarPago(false);
     setGuardandoPago(false);
+  };
+
+  const abrirComprobantePago = async (archivo: RegistroFlexible) => {
+    setError("");
+    const ruta = String(archivo.ruta_storage || "");
+    const { data, error: errorUrl } = await supabase.storage
+      .from("gan-pagos-personal")
+      .createSignedUrl(ruta, 60);
+
+    if (errorUrl || !data?.signedUrl) {
+      setError(`No se pudo abrir el comprobante: ${errorUrl?.message || "Error desconocido"}`);
+      return;
+    }
+
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
   };
 
   const abrirDocumento = async (archivo: Archivo) => {
@@ -603,6 +721,16 @@ export default function KardexTrabajadorPage() {
                 </select>
               </CampoPago>
 
+              <CampoPago label="Comprobante bancario">
+                <input
+                  id="comprobante-pago"
+                  type="file"
+                  accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf"
+                  onChange={(e) => setComprobante(e.target.files?.[0] || null)}
+                  className="archivo-pago"
+                />
+              </CampoPago>
+
               <div className="campo-pago campo-pago-observaciones">
                 <label>Observaciones</label>
                 <textarea
@@ -652,6 +780,8 @@ export default function KardexTrabajadorPage() {
           registros={pagos}
           monedaBase={trabajador.moneda}
           vacio="No hay pagos registrados."
+          comprobantes={comprobantesPago}
+          onVerComprobante={abrirComprobantePago}
         />
 
         <SeccionHistorial
@@ -750,6 +880,8 @@ function SeccionHistorial({
   monedaBase,
   vacio,
   esAsignacion = false,
+  comprobantes,
+  onVerComprobante,
 }: {
   titulo: string;
   subtitulo: string;
@@ -757,6 +889,8 @@ function SeccionHistorial({
   monedaBase: string;
   vacio: string;
   esAsignacion?: boolean;
+  comprobantes?: Record<string, RegistroFlexible[]>;
+  onVerComprobante?: (archivo: RegistroFlexible) => void;
 }) {
   return (
     <section className="panel">
@@ -821,6 +955,16 @@ function SeccionHistorial({
                     <strong>{moneda(valor, mon)}</strong>
                   ) : null}
                   {estado ? <span>{texto(estado)}</span> : null}
+                  {comprobantes?.[String(item.id)]?.length ? (
+                    <button
+                      className="btn-comprobante"
+                      onClick={() =>
+                        onVerComprobante?.(comprobantes[String(item.id)][0])
+                      }
+                    >
+                      Ver comprobante
+                    </button>
+                  ) : null}
                 </div>
               </div>
             );
@@ -881,7 +1025,13 @@ function Estilos() {
         background: white; color: #1d2c23; font-family: inherit; outline: none;
       }
       .campo-pago input, .campo-pago select { height: 42px; padding: 0 10px; }
+      .campo-pago input.archivo-pago { height: auto; min-height: 42px; padding: 8px; font-size: 11px; }
       .campo-pago textarea { min-height: 80px; padding: 10px; resize: vertical; }
+      .btn-comprobante {
+        border: 1px solid #bfd6c7; background: #edf7f0; color: #176b3a;
+        border-radius: 7px; padding: 6px 9px; font-size: 10px;
+        font-weight: 800; cursor: pointer; font-family: inherit; white-space: nowrap;
+      }
       .campo-pago-observaciones { grid-column: span 3; }
       .pago-neto {
         background: #edf7f0; border-radius: 9px; padding: 12px 14px;
