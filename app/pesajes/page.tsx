@@ -264,28 +264,32 @@ export default function PesajesPage() {
 
   if (loading) {
     return (
-      <main style={estilos.cargando}>
-        Cargando pesajes...
-      </main>
+      <>
+        <Sidebar />
+        <main className="pesajes-main pesajes-loading">
+          Cargando pesajes...
+        </main>
+      </>
     );
   }
 
   return (
-    <main style={estilos.pagina}>
+    <>
       <Sidebar />
 
-      <section style={estilos.contenido}>
-        <header style={estilos.header}>
+      <main className="pesajes-main">
+        <header className="pesajes-header">
           <div>
-            <h1 style={estilos.titulo}>Pesajes</h1>
-
-            <p style={estilos.subtitulo}>
-              Historial y control de peso por lote
-            </p>
+            <h1>Pesajes</h1>
+            <p>Historial y control de peso por lote</p>
           </div>
 
           <button
-            style={estilos.botonPrincipal}
+            className={
+              mostrarFormulario
+                ? "boton-secundario boton-header"
+                : "boton-principal boton-header"
+            }
             onClick={() => {
               setMensaje("");
               setMostrarFormulario(!mostrarFormulario);
@@ -299,21 +303,17 @@ export default function PesajesPage() {
 
         {mensaje && (
           <div
-            style={{
-              ...estilos.mensaje,
-              background: mensaje.includes("correctamente")
-                ? "#edf8f0"
-                : "#fff1f1",
-              color: mensaje.includes("correctamente")
-                ? "#176b3a"
-                : "#b42318",
-            }}
+            className={`mensaje ${
+              mensaje.includes("correctamente")
+                ? "mensaje-exito"
+                : "mensaje-error"
+            }`}
           >
             {mensaje}
           </div>
         )}
 
-        <div style={estilos.resumenGrid}>
+        <section className="resumen-grid">
           <Tarjeta
             titulo="Pesajes registrados"
             valor={String(pesajes.length)}
@@ -344,22 +344,18 @@ export default function PesajesPage() {
                 : "Sin registros"
             }
           />
-        </div>
+        </section>
 
         {mostrarFormulario && (
           <form
             onSubmit={guardarPesaje}
-            style={estilos.formulario}
+            className="formulario"
           >
-            <h2 style={estilos.formTitulo}>
-              Registrar pesaje
-            </h2>
+            <h2>Registrar pesaje</h2>
 
-            <div style={estilos.formGrid}>
-              <div>
-                <label style={estilos.label}>
-                  Fecha *
-                </label>
+            <div className="form-grid">
+              <div className="campo">
+                <label>Fecha *</label>
 
                 <input
                   type="date"
@@ -370,22 +366,18 @@ export default function PesajesPage() {
                       fecha: e.target.value,
                     })
                   }
-                  style={estilos.input}
                   required
                 />
               </div>
 
-              <div>
-                <label style={estilos.label}>
-                  Lote *
-                </label>
+              <div className="campo">
+                <label>Lote *</label>
 
                 <select
                   value={form.lote_id}
                   onChange={(e) =>
                     seleccionarLote(e.target.value)
                   }
-                  style={estilos.input}
                   required
                 >
                   <option value="">
@@ -404,10 +396,8 @@ export default function PesajesPage() {
                 </select>
               </div>
 
-              <div>
-                <label style={estilos.label}>
-                  Cantidad pesada *
-                </label>
+              <div className="campo">
+                <label>Cantidad pesada *</label>
 
                 <input
                   type="number"
@@ -421,15 +411,12 @@ export default function PesajesPage() {
                     })
                   }
                   placeholder="Ej. 102"
-                  style={estilos.input}
                   required
                 />
               </div>
 
-              <div>
-                <label style={estilos.label}>
-                  Peso promedio (kg) *
-                </label>
+              <div className="campo">
+                <label>Peso promedio (kg) *</label>
 
                 <input
                   type="number"
@@ -443,15 +430,12 @@ export default function PesajesPage() {
                     })
                   }
                   placeholder="Ej. 325"
-                  style={estilos.input}
                   required
                 />
               </div>
 
-              <div>
-                <label style={estilos.label}>
-                  Peso mínimo (kg)
-                </label>
+              <div className="campo">
+                <label>Peso mínimo (kg)</label>
 
                 <input
                   type="number"
@@ -465,14 +449,11 @@ export default function PesajesPage() {
                     })
                   }
                   placeholder="Ej. 280"
-                  style={estilos.input}
                 />
               </div>
 
-              <div>
-                <label style={estilos.label}>
-                  Peso máximo (kg)
-                </label>
+              <div className="campo">
+                <label>Peso máximo (kg)</label>
 
                 <input
                   type="number"
@@ -486,15 +467,12 @@ export default function PesajesPage() {
                     })
                   }
                   placeholder="Ej. 370"
-                  style={estilos.input}
                 />
               </div>
             </div>
 
-            <div style={{ marginTop: "18px" }}>
-              <label style={estilos.label}>
-                Observaciones
-              </label>
+            <div className="observaciones">
+              <label>Observaciones</label>
 
               <textarea
                 value={form.observaciones}
@@ -505,18 +483,13 @@ export default function PesajesPage() {
                   })
                 }
                 placeholder="Información adicional del pesaje..."
-                style={{
-                  ...estilos.input,
-                  minHeight: "90px",
-                  resize: "vertical",
-                }}
               />
             </div>
 
-            <div style={estilos.formBotones}>
+            <div className="form-botones">
               <button
                 type="button"
-                style={estilos.botonSecundario}
+                className="boton-secundario"
                 onClick={() =>
                   setMostrarFormulario(false)
                 }
@@ -527,8 +500,8 @@ export default function PesajesPage() {
               <button
                 type="submit"
                 disabled={guardando}
+                className="boton-principal"
                 style={{
-                  ...estilos.botonPrincipal,
                   opacity: guardando ? 0.7 : 1,
                 }}
               >
@@ -540,23 +513,19 @@ export default function PesajesPage() {
           </form>
         )}
 
-        <div style={estilos.tablaPanel}>
-          <div style={estilos.tablaHeader}>
-            <h2 style={estilos.tablaTitulo}>
-              Historial de pesajes
-            </h2>
+        <section className="pesajes-panel">
+          <div className="panel-header">
+            <h2>Historial de pesajes</h2>
 
-            <span style={estilos.tablaSubtitulo}>
+            <span>
               {pesajes.length} registro
               {pesajes.length === 1 ? "" : "s"}
             </span>
           </div>
 
           {pesajes.length === 0 ? (
-            <div style={estilos.vacio}>
-              <div style={{ fontSize: "38px" }}>
-                ⚖️
-              </div>
+            <div className="vacio">
+              <div className="vacio-icono">⚖️</div>
 
               <strong>
                 No hay pesajes registrados
@@ -567,79 +536,766 @@ export default function PesajesPage() {
               </span>
             </div>
           ) : (
-            <div style={{ overflowX: "auto" }}>
-              <table style={estilos.tabla}>
-                <thead>
-                  <tr>
-                    <th style={estilos.th}>Fecha</th>
-                    <th style={estilos.th}>Lote</th>
-                    <th style={estilos.th}>Animales</th>
-                    <th style={estilos.th}>Promedio</th>
-                    <th style={estilos.th}>Mínimo</th>
-                    <th style={estilos.th}>Máximo</th>
-                    <th style={estilos.th}>
-                      Observaciones
-                    </th>
-                  </tr>
-                </thead>
+            <>
+              <div className="pesajes-desktop">
+                <div className="tabla-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Fecha</th>
+                        <th>Lote</th>
+                        <th>Animales</th>
+                        <th>Promedio</th>
+                        <th>Mínimo</th>
+                        <th>Máximo</th>
+                        <th>Observaciones</th>
+                      </tr>
+                    </thead>
 
-                <tbody>
-                  {pesajes.map((pesaje) => (
-                    <tr key={pesaje.id}>
-                      <td style={estilos.td}>
-                        {formatearFecha(pesaje.fecha)}
-                      </td>
+                    <tbody>
+                      {pesajes.map((pesaje) => (
+                        <tr key={pesaje.id}>
+                          <td>
+                            {formatearFecha(
+                              pesaje.fecha
+                            )}
+                          </td>
 
-                      <td style={estilos.td}>
-                        <strong>
+                          <td>
+                            <strong>
+                              {pesaje.gan_lotes_ganado
+                                ?.nombre || "—"}
+                            </strong>
+                          </td>
+
+                          <td>
+                            {pesaje.cantidad_pesada ?? "—"}
+                          </td>
+
+                          <td>
+                            <strong className="peso-verde">
+                              {Number(
+                                pesaje.peso_promedio
+                              ).toLocaleString()}{" "}
+                              kg
+                            </strong>
+                          </td>
+
+                          <td>
+                            {pesaje.peso_minimo !== null
+                              ? `${Number(
+                                  pesaje.peso_minimo
+                                ).toLocaleString()} kg`
+                              : "—"}
+                          </td>
+
+                          <td>
+                            {pesaje.peso_maximo !== null
+                              ? `${Number(
+                                  pesaje.peso_maximo
+                                ).toLocaleString()} kg`
+                              : "—"}
+                          </td>
+
+                          <td>
+                            {pesaje.observaciones || "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="pesajes-mobile">
+                {pesajes.map((pesaje) => (
+                  <article
+                    key={pesaje.id}
+                    className="pesaje-card"
+                  >
+                    <div className="pesaje-top">
+                      <div>
+                        <span className="card-label">
+                          PESAJE
+                        </span>
+
+                        <h3>
                           {pesaje.gan_lotes_ganado
-                            ?.nombre || "—"}
+                            ?.nombre || "Sin lote"}
+                        </h3>
+
+                        <span className="fecha-mobile">
+                          {formatearFecha(
+                            pesaje.fecha
+                          )}
+                        </span>
+                      </div>
+
+                      <span className="animales-badge">
+                        {pesaje.cantidad_pesada ?? "—"}{" "}
+                        animales
+                      </span>
+                    </div>
+
+                    <div className="peso-principal">
+                      <span>Peso promedio</span>
+
+                      <strong>
+                        {Number(
+                          pesaje.peso_promedio
+                        ).toLocaleString()}{" "}
+                        kg
+                      </strong>
+
+                      <small>por animal</small>
+                    </div>
+
+                    <div className="pesos-grid">
+                      <div>
+                        <span>Peso mínimo</span>
+                        <strong>
+                          {pesaje.peso_minimo !== null
+                            ? `${Number(
+                                pesaje.peso_minimo
+                              ).toLocaleString()} kg`
+                            : "—"}
                         </strong>
-                      </td>
+                      </div>
 
-                      <td style={estilos.td}>
-                        {pesaje.cantidad_pesada ?? "—"}
-                      </td>
-
-                      <td style={estilos.td}>
-                        <strong
-                          style={{ color: "#176b3a" }}
-                        >
-                          {Number(
-                            pesaje.peso_promedio
-                          ).toLocaleString()}{" "}
-                          kg
+                      <div>
+                        <span>Peso máximo</span>
+                        <strong>
+                          {pesaje.peso_maximo !== null
+                            ? `${Number(
+                                pesaje.peso_maximo
+                              ).toLocaleString()} kg`
+                            : "—"}
                         </strong>
-                      </td>
+                      </div>
+                    </div>
 
-                      <td style={estilos.td}>
-                        {pesaje.peso_minimo !== null
-                          ? `${Number(
-                              pesaje.peso_minimo
-                            ).toLocaleString()} kg`
-                          : "—"}
-                      </td>
+                    <div className="detalle-mobile">
+                      <span>Observaciones</span>
 
-                      <td style={estilos.td}>
-                        {pesaje.peso_maximo !== null
-                          ? `${Number(
-                              pesaje.peso_maximo
-                            ).toLocaleString()} kg`
-                          : "—"}
-                      </td>
-
-                      <td style={estilos.td}>
-                        {pesaje.observaciones || "—"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      <strong>
+                        {pesaje.observaciones ||
+                          "Sin observaciones"}
+                      </strong>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </>
           )}
-        </div>
-      </section>
-    </main>
+        </section>
+      </main>
+
+      <style jsx global>{`
+        * {
+          box-sizing: border-box;
+        }
+
+        body {
+          margin: 0;
+          background: #f4f7f3;
+        }
+
+        .pesajes-main {
+          margin-left: 235px;
+          min-height: 100vh;
+          background: #f4f7f3;
+          padding: 32px;
+          font-family: Arial, sans-serif;
+          color: #20352a;
+          overflow-x: hidden;
+        }
+
+        .pesajes-loading {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #176b3a;
+          font-weight: 700;
+        }
+
+        .pesajes-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 20px;
+          margin-bottom: 25px;
+        }
+
+        .pesajes-header h1 {
+          margin: 0;
+          font-size: 28px;
+          color: #143e28;
+        }
+
+        .pesajes-header p {
+          margin: 7px 0 0;
+          color: #718078;
+          font-size: 14px;
+        }
+
+        .boton-principal,
+        .boton-secundario {
+          border-radius: 10px;
+          padding: 12px 18px;
+          font-size: 14px;
+          font-weight: 700;
+          cursor: pointer;
+          font-family: inherit;
+        }
+
+        .boton-principal {
+          background: #176b3a;
+          border: none;
+          color: white;
+        }
+
+        .boton-secundario {
+          background: white;
+          border: 1px solid #d7dfd9;
+          color: #53675b;
+        }
+
+        .mensaje {
+          padding: 12px 15px;
+          border-radius: 10px;
+          margin-bottom: 20px;
+          font-size: 13px;
+        }
+
+        .mensaje-exito {
+          background: #edf8f0;
+          color: #176b3a;
+        }
+
+        .mensaje-error {
+          background: #fff1f1;
+          color: #b42318;
+        }
+
+        .resumen-grid {
+          display: grid;
+          grid-template-columns:
+            repeat(3, minmax(0, 1fr));
+          gap: 18px;
+          margin-bottom: 22px;
+        }
+
+        .resumen-card {
+          background: white;
+          border: 1px solid #e0e8e2;
+          border-radius: 14px;
+          padding: 19px;
+          display: flex;
+          flex-direction: column;
+          gap: 7px;
+          min-width: 0;
+        }
+
+        .resumen-card > span:first-child {
+          color: #718078;
+          font-size: 13px;
+          font-weight: 600;
+        }
+
+        .resumen-card strong {
+          color: #176b3a;
+          font-size: 27px;
+        }
+
+        .resumen-card small {
+          color: #98a39c;
+          font-size: 12px;
+        }
+
+        .formulario {
+          background: white;
+          border: 1px solid #e0e8e2;
+          border-radius: 15px;
+          padding: 24px;
+          margin-bottom: 22px;
+        }
+
+        .formulario h2 {
+          margin: 0 0 22px;
+          color: #244b34;
+          font-size: 18px;
+        }
+
+        .form-grid {
+          display: grid;
+          grid-template-columns:
+            repeat(3, minmax(0, 1fr));
+          gap: 17px;
+        }
+
+        .campo {
+          min-width: 0;
+        }
+
+        .campo label,
+        .observaciones label {
+          display: block;
+          margin-bottom: 7px;
+          color: #43594b;
+          font-size: 13px;
+          font-weight: 600;
+        }
+
+        .campo input,
+        .campo select,
+        .observaciones textarea {
+          width: 100%;
+          box-sizing: border-box;
+          border: 1px solid #d7dfd9;
+          border-radius: 9px;
+          padding: 11px 12px;
+          font-size: 14px;
+          outline: none;
+          background: white;
+          color: #20352a;
+          font-family: inherit;
+        }
+
+        .observaciones {
+          margin-top: 18px;
+        }
+
+        .observaciones textarea {
+          min-height: 90px;
+          resize: vertical;
+        }
+
+        .form-botones {
+          display: flex;
+          justify-content: flex-end;
+          gap: 10px;
+          margin-top: 22px;
+        }
+
+        .pesajes-panel {
+          background: white;
+          border: 1px solid #e0e8e2;
+          border-radius: 15px;
+          overflow: hidden;
+        }
+
+        .panel-header {
+          padding: 20px 22px;
+          border-bottom: 1px solid #edf1ee;
+        }
+
+        .panel-header h2 {
+          margin: 0;
+          font-size: 17px;
+          color: #244b34;
+        }
+
+        .panel-header span {
+          display: block;
+          margin-top: 5px;
+          color: #94a198;
+          font-size: 12px;
+        }
+
+        .tabla-wrap {
+          width: 100%;
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+        }
+
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 13px;
+        }
+
+        th {
+          text-align: left;
+          padding: 13px 16px;
+          background: #f7faf7;
+          color: #66776c;
+          font-weight: 700;
+          border-bottom: 1px solid #edf1ee;
+          white-space: nowrap;
+        }
+
+        td {
+          padding: 14px 16px;
+          border-bottom: 1px solid #edf1ee;
+          color: #45594c;
+        }
+
+        .peso-verde {
+          color: #176b3a;
+        }
+
+        .vacio {
+          min-height: 250px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 9px;
+          color: #829087;
+          font-size: 13px;
+          text-align: center;
+          padding: 24px;
+        }
+
+        .vacio-icono {
+          font-size: 38px;
+        }
+
+        .pesajes-mobile {
+          display: none;
+        }
+                /* ===========================
+           TABLET
+        =========================== */
+
+        @media (max-width: 1100px) and (min-width: 821px) {
+          .pesajes-main {
+            padding: 24px;
+          }
+
+          .form-grid {
+            grid-template-columns:
+              repeat(2, minmax(0, 1fr));
+          }
+        }
+
+        /* ===========================
+           CELULAR
+        =========================== */
+
+        @media (max-width: 820px) {
+          html,
+          body {
+            width: 100%;
+            max-width: 100%;
+            overflow-x: hidden;
+          }
+
+          .pesajes-main {
+            margin-left: 0;
+            width: 100%;
+            max-width: 100%;
+            min-height: 100vh;
+            padding: 84px 14px 28px;
+            overflow-x: hidden;
+          }
+
+          .pesajes-loading {
+            padding-top: 84px;
+          }
+
+          .pesajes-header {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 14px;
+            margin-bottom: 18px;
+          }
+
+          .pesajes-header h1 {
+            font-size: 25px;
+          }
+
+          .pesajes-header p {
+            margin-top: 6px;
+            font-size: 13px;
+            line-height: 1.4;
+          }
+
+          .boton-header {
+            width: 100%;
+            min-height: 46px;
+          }
+
+          /* 3 INDICADORES */
+
+          .resumen-grid {
+            grid-template-columns:
+              repeat(3, minmax(0, 1fr));
+            gap: 8px;
+            margin-bottom: 16px;
+          }
+
+          .resumen-card {
+            padding: 14px 10px;
+            border-radius: 12px;
+            min-height: 112px;
+            gap: 5px;
+          }
+
+          .resumen-card > span:first-child {
+            font-size: 10px;
+            line-height: 1.25;
+          }
+
+          .resumen-card strong {
+            font-size: 25px;
+            line-height: 1.1;
+          }
+
+          .resumen-card small {
+            font-size: 9px;
+            line-height: 1.3;
+          }
+
+          /* FORMULARIO */
+
+          .formulario {
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+          }
+
+          .formulario h2 {
+            margin-bottom: 18px;
+            font-size: 17px;
+          }
+
+          .form-grid {
+            grid-template-columns: 1fr;
+            gap: 14px;
+          }
+
+          .campo input,
+          .campo select,
+          .observaciones textarea {
+            font-size: 16px;
+          }
+
+          .campo input,
+          .campo select {
+            min-height: 46px;
+          }
+
+          .observaciones {
+            margin-top: 14px;
+          }
+
+          .observaciones textarea {
+            min-height: 100px;
+          }
+
+          .form-botones {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 9px;
+            margin-top: 18px;
+          }
+
+          .form-botones button {
+            width: 100%;
+            min-height: 45px;
+            padding-left: 7px;
+            padding-right: 7px;
+          }
+
+          /* PANEL */
+
+          .pesajes-panel {
+            border-radius: 12px;
+          }
+
+          .panel-header {
+            padding: 16px;
+          }
+
+          .panel-header h2 {
+            font-size: 17px;
+          }
+
+          .panel-header span {
+            font-size: 11px;
+          }
+
+          /* OCULTAR TABLA EN CELULAR */
+
+          .pesajes-desktop {
+            display: none;
+          }
+
+          /* FICHAS MÓVILES */
+
+          .pesajes-mobile {
+            display: block;
+            padding: 12px;
+          }
+
+          .pesaje-card {
+            background: #ffffff;
+            border: 1px solid #dfe8e2;
+            border-radius: 12px;
+            padding: 14px;
+            margin-bottom: 10px;
+            min-width: 0;
+          }
+
+          .pesaje-card:last-child {
+            margin-bottom: 0;
+          }
+
+          .pesaje-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 10px;
+            padding-bottom: 13px;
+            border-bottom: 1px solid #edf1ee;
+          }
+
+          .card-label {
+            display: block;
+            color: #94a198;
+            font-size: 9px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            margin-bottom: 3px;
+          }
+
+          .pesaje-top h3 {
+            margin: 0;
+            color: #174c2e;
+            font-size: 18px;
+            overflow-wrap: anywhere;
+          }
+
+          .fecha-mobile {
+            display: block;
+            margin-top: 5px;
+            color: #89978e;
+            font-size: 11px;
+          }
+
+          .animales-badge {
+            display: inline-block;
+            background: #eaf6ee;
+            color: #176b3a;
+            border-radius: 20px;
+            padding: 6px 10px;
+            font-size: 10px;
+            font-weight: 700;
+            white-space: nowrap;
+          }
+
+          .peso-principal {
+            background: #f6faf7;
+            border-radius: 9px;
+            padding: 14px;
+            margin-top: 14px;
+          }
+
+          .peso-principal span {
+            display: block;
+            color: #849188;
+            font-size: 10px;
+            margin-bottom: 5px;
+          }
+
+          .peso-principal strong {
+            display: block;
+            color: #176b3a;
+            font-size: 26px;
+            line-height: 1.1;
+          }
+
+          .peso-principal small {
+            display: block;
+            color: #9aa59e;
+            font-size: 9px;
+            margin-top: 4px;
+          }
+
+          .pesos-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+          }
+
+          .pesos-grid > div {
+            background: #f8faf8;
+            border-radius: 9px;
+            padding: 12px;
+            min-width: 0;
+          }
+
+          .pesos-grid span {
+            display: block;
+            color: #8a9890;
+            font-size: 10px;
+            margin-bottom: 5px;
+          }
+
+          .pesos-grid strong {
+            display: block;
+            color: #35483b;
+            font-size: 13px;
+            line-height: 1.35;
+            overflow-wrap: anywhere;
+          }
+
+          .detalle-mobile {
+            padding-top: 14px;
+          }
+
+          .detalle-mobile span {
+            display: block;
+            color: #8a9890;
+            font-size: 10px;
+            margin-bottom: 5px;
+          }
+
+          .detalle-mobile strong {
+            display: block;
+            color: #35483b;
+            font-size: 12px;
+            line-height: 1.45;
+            font-weight: 600;
+            overflow-wrap: anywhere;
+          }
+        }
+
+        @media (max-width: 380px) {
+          .pesajes-main {
+            padding-left: 10px;
+            padding-right: 10px;
+          }
+
+          .resumen-grid {
+            gap: 6px;
+          }
+
+          .resumen-card {
+            padding: 12px 8px;
+          }
+
+          .resumen-card > span:first-child {
+            font-size: 9px;
+          }
+
+          .resumen-card strong {
+            font-size: 22px;
+          }
+
+          .resumen-card small {
+            font-size: 8px;
+          }
+
+          .animales-badge {
+            font-size: 9px;
+            padding: 5px 8px;
+          }
+        }
+      `}</style>
+    </>
   );
 }
 
@@ -653,230 +1309,10 @@ function Tarjeta({
   detalle: string;
 }) {
   return (
-    <div style={estilos.tarjeta}>
-      <span style={estilos.tarjetaTitulo}>
-        {titulo}
-      </span>
-
-      <strong style={estilos.tarjetaValor}>
-        {valor}
-      </strong>
-
-      <span style={estilos.tarjetaDetalle}>
-        {detalle}
-      </span>
+    <div className="resumen-card">
+      <span>{titulo}</span>
+      <strong>{valor}</strong>
+      <small>{detalle}</small>
     </div>
   );
 }
-
-const estilos: Record<string, React.CSSProperties> = {
-  pagina: {
-    minHeight: "100vh",
-    background: "#f4f7f3",
-    fontFamily: "Arial, sans-serif",
-    color: "#20352a",
-  },
-
-  cargando: {
-    minHeight: "100vh",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "#f4f7f3",
-    fontFamily: "Arial, sans-serif",
-    color: "#176b3a",
-    fontWeight: 700,
-  },
-
-  contenido: {
-    marginLeft: "235px",
-    padding: "32px",
-  },
-
-  header: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: "20px",
-    marginBottom: "25px",
-  },
-
-  titulo: {
-    margin: 0,
-    fontSize: "28px",
-    color: "#143e28",
-  },
-
-  subtitulo: {
-    margin: "7px 0 0",
-    color: "#718078",
-    fontSize: "14px",
-  },
-
-  botonPrincipal: {
-    background: "#176b3a",
-    border: "none",
-    borderRadius: "10px",
-    color: "white",
-    padding: "12px 18px",
-    fontSize: "14px",
-    fontWeight: 700,
-    cursor: "pointer",
-  },
-
-  botonSecundario: {
-    background: "white",
-    border: "1px solid #d7dfd9",
-    borderRadius: "10px",
-    color: "#53675b",
-    padding: "12px 18px",
-    fontSize: "14px",
-    fontWeight: 600,
-    cursor: "pointer",
-  },
-
-  mensaje: {
-    padding: "12px 15px",
-    borderRadius: "10px",
-    marginBottom: "20px",
-    fontSize: "13px",
-  },
-
-  resumenGrid: {
-    display: "grid",
-    gridTemplateColumns:
-      "repeat(3, minmax(0, 1fr))",
-    gap: "18px",
-    marginBottom: "22px",
-  },
-
-  tarjeta: {
-    background: "white",
-    border: "1px solid #e0e8e2",
-    borderRadius: "14px",
-    padding: "19px",
-    display: "flex",
-    flexDirection: "column",
-    gap: "7px",
-  },
-
-  tarjetaTitulo: {
-    color: "#718078",
-    fontSize: "13px",
-    fontWeight: 600,
-  },
-
-  tarjetaValor: {
-    color: "#176b3a",
-    fontSize: "27px",
-  },
-
-  tarjetaDetalle: {
-    color: "#98a39c",
-    fontSize: "12px",
-  },
-
-  formulario: {
-    background: "white",
-    border: "1px solid #e0e8e2",
-    borderRadius: "15px",
-    padding: "24px",
-    marginBottom: "22px",
-  },
-
-  formTitulo: {
-    margin: "0 0 22px",
-    color: "#244b34",
-    fontSize: "18px",
-  },
-
-  formGrid: {
-    display: "grid",
-    gridTemplateColumns:
-      "repeat(3, minmax(0, 1fr))",
-    gap: "17px",
-  },
-
-  label: {
-    display: "block",
-    marginBottom: "7px",
-    color: "#43594b",
-    fontSize: "13px",
-    fontWeight: 600,
-  },
-
-  input: {
-    width: "100%",
-    boxSizing: "border-box",
-    border: "1px solid #d7dfd9",
-    borderRadius: "9px",
-    padding: "11px 12px",
-    fontSize: "14px",
-    outline: "none",
-    background: "white",
-  },
-
-  formBotones: {
-    display: "flex",
-    justifyContent: "flex-end",
-    gap: "10px",
-    marginTop: "22px",
-  },
-
-  tablaPanel: {
-    background: "white",
-    border: "1px solid #e0e8e2",
-    borderRadius: "15px",
-    overflow: "hidden",
-  },
-
-  tablaHeader: {
-    padding: "20px 22px",
-    borderBottom: "1px solid #edf1ee",
-  },
-
-  tablaTitulo: {
-    margin: 0,
-    fontSize: "17px",
-    color: "#244b34",
-  },
-
-  tablaSubtitulo: {
-    display: "block",
-    marginTop: "5px",
-    color: "#94a198",
-    fontSize: "12px",
-  },
-
-  tabla: {
-    width: "100%",
-    borderCollapse: "collapse",
-    fontSize: "13px",
-  },
-
-  th: {
-    textAlign: "left",
-    padding: "13px 16px",
-    background: "#f7faf7",
-    color: "#66776c",
-    fontWeight: 700,
-    borderBottom: "1px solid #edf1ee",
-  },
-
-  td: {
-    padding: "14px 16px",
-    borderBottom: "1px solid #edf1ee",
-    color: "#45594c",
-  },
-
-  vacio: {
-    minHeight: "250px",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "9px",
-    color: "#829087",
-    fontSize: "13px",
-  },
-};
