@@ -112,6 +112,7 @@ export default function KardexTrabajadorPage() {
   const [asignaciones, setAsignaciones] = useState<RegistroFlexible[]>([]);
   const [mostrarPago, setMostrarPago] = useState(false);
   const [guardandoPago, setGuardandoPago] = useState(false);
+  const [pagoEditandoId, setPagoEditandoId] = useState<string | null>(null);
   const [comprobante, setComprobante] = useState<File | null>(null);
   const [comprobantesPago, setComprobantesPago] = useState<Record<string, RegistroFlexible[]>>({});
   const [mensaje, setMensaje] = useState("");
@@ -313,9 +314,27 @@ export default function KardexTrabajadorPage() {
 
     setGuardandoPago(true);
 
-    const { data: pagoCreado, error: errorPago } = await supabase.rpc(
-      "gan_registrar_pago_personal",
-      {
+    let pagoId = pagoEditandoId || "";
+    let errorPago: { message: string } | null = null;
+
+    if (pagoEditandoId) {
+      const resultado = await supabase.rpc("gan_editar_pago_personal", {
+        p_pago_id: pagoEditandoId,
+        p_fecha_pago: pago.fecha_pago,
+        p_periodo_desde: pago.periodo_desde || null,
+        p_periodo_hasta: pago.periodo_hasta || null,
+        p_salario: salario,
+        p_bonos: bonos,
+        p_horas_extra: horasExtra,
+        p_descuentos: descuentos,
+        p_otros: otros,
+        p_moneda: pago.moneda,
+        p_metodo_pago: pago.metodo_pago.trim() || null,
+        p_observaciones: pago.observaciones.trim() || null,
+      });
+      errorPago = resultado.error;
+    } else {
+      const resultado = await supabase.rpc("gan_registrar_pago_personal", {
         p_trabajador_id: trabajador.id,
         p_fecha_pago: pago.fecha_pago,
         p_periodo_desde: pago.periodo_desde || null,
@@ -328,11 +347,17 @@ export default function KardexTrabajadorPage() {
         p_moneda: pago.moneda,
         p_metodo_pago: pago.metodo_pago.trim() || null,
         p_observaciones: pago.observaciones.trim() || null,
-      }
-    );
+      });
+      errorPago = resultado.error;
+      pagoId = resultado.data ? String(resultado.data) : "";
+    }
 
-    if (errorPago || !pagoCreado) {
-      setError(`No se pudo registrar el pago: ${errorPago?.message || "No se obtuvo el ID del pago."}`);
+    if (errorPago || !pagoId) {
+      setError(
+        `No se pudo ${pagoEditandoId ? "editar" : "registrar"} el pago: ${
+          errorPago?.message || "No se obtuvo el ID del pago."
+        }`
+      );
       setGuardandoPago(false);
       return;
     }
@@ -354,7 +379,7 @@ export default function KardexTrabajadorPage() {
 
       const extension = comprobante.name.split(".").pop()?.toLowerCase() || "archivo";
       const nombreSeguro = `comprobante-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${extension}`;
-      const ruta = `${fincaId}/${trabajador.id}/${pagoCreado}/${nombreSeguro}`;
+      const ruta = `${fincaId}/${trabajador.id}/${pagoId}/${nombreSeguro}`;
 
       const { error: errorStorage } = await supabase.storage
         .from("gan-pagos-personal")
@@ -370,7 +395,7 @@ export default function KardexTrabajadorPage() {
         const { error: errorRegistroArchivo } = await supabase
           .from("gan_pago_personal_archivos")
           .insert({
-            pago_id: pagoCreado,
+            pago_id: pagoId,
             finca_id: fincaId,
             nombre_archivo: comprobante.name,
             ruta_storage: ruta,
@@ -418,7 +443,15 @@ export default function KardexTrabajadorPage() {
       if (errorComprobante) {
         setError(`El pago fue registrado, pero hubo un problema con el comprobante: ${errorComprobante}`);
       } else {
-        setMensaje(comprobante ? "Pago y comprobante registrados correctamente." : "Pago registrado correctamente.");
+        setMensaje(
+          pagoEditandoId
+            ? comprobante
+              ? "Pago editado y nuevo comprobante agregado correctamente."
+              : "Pago editado correctamente."
+            : comprobante
+              ? "Pago y comprobante registrados correctamente."
+              : "Pago registrado correctamente."
+        );
       }
     }
 
@@ -435,11 +468,99 @@ export default function KardexTrabajadorPage() {
       metodo_pago: "",
       observaciones: "",
     });
+    setPagoEditandoId(null);
     setComprobante(null);
     const inputComprobante = document.getElementById("comprobante-pago") as HTMLInputElement | null;
     if (inputComprobante) inputComprobante.value = "";
     setMostrarPago(false);
     setGuardandoPago(false);
+  };
+
+  const editarPago = (item: RegistroFlexible) => {
+    setError("");
+    setMensaje("");
+    setPagoEditandoId(String(item.id));
+    setPago({
+      fecha_pago: String(item.fecha_pago || "").slice(0, 10),
+      periodo_desde: item.periodo_desde ? String(item.periodo_desde).slice(0, 10) : "",
+      periodo_hasta: item.periodo_hasta ? String(item.periodo_hasta).slice(0, 10) : "",
+      salario: String(item.salario ?? 0),
+      bonos: String(item.bonos ?? 0),
+      horas_extra: String(item.horas_extra ?? 0),
+      descuentos: String(item.descuentos ?? 0),
+      otros: String(item.otros ?? 0),
+      moneda: String(item.moneda || "BOB"),
+      metodo_pago: String(item.metodo_pago || ""),
+      observaciones: String(item.observaciones || ""),
+    });
+    setComprobante(null);
+    setMostrarPago(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const cancelarEdicionPago = () => {
+    if (!trabajador) return;
+    setPagoEditandoId(null);
+    setComprobante(null);
+    setPago({
+      fecha_pago: new Date().toISOString().slice(0, 10),
+      periodo_desde: "",
+      periodo_hasta: "",
+      salario: String(trabajador.salario_base ?? 0),
+      bonos: "0",
+      horas_extra: "0",
+      descuentos: "0",
+      otros: "0",
+      moneda: trabajador.moneda || "BOB",
+      metodo_pago: "",
+      observaciones: "",
+    });
+    setMostrarPago(false);
+  };
+
+  const eliminarPago = async (item: RegistroFlexible) => {
+    const confirmado = window.confirm(
+      "¿Eliminar este pago? También se eliminarán sus comprobantes bancarios. Esta acción no se puede deshacer."
+    );
+    if (!confirmado) return;
+
+    setError("");
+    setMensaje("");
+
+    const pagoId = String(item.id);
+    const archivos = comprobantesPago[pagoId] || [];
+    const rutas = archivos
+      .map((archivo) => String(archivo.ruta_storage || ""))
+      .filter(Boolean);
+
+    if (rutas.length > 0) {
+      const { error: errorStorage } = await supabase.storage
+        .from("gan-pagos-personal")
+        .remove(rutas);
+
+      if (errorStorage) {
+        setError(`No se eliminó el pago porque no se pudo borrar su comprobante: ${errorStorage.message}`);
+        return;
+      }
+    }
+
+    const { error: errorEliminar } = await supabase.rpc(
+      "gan_eliminar_pago_personal",
+      { p_pago_id: pagoId }
+    );
+
+    if (errorEliminar) {
+      setError(`No se pudo eliminar el pago: ${errorEliminar.message}`);
+      return;
+    }
+
+    setPagos((actuales) => actuales.filter((p) => String(p.id) !== pagoId));
+    setComprobantesPago((actuales) => {
+      const copia = { ...actuales };
+      delete copia[pagoId];
+      return copia;
+    });
+    setMensaje("Pago eliminado correctamente.");
   };
 
   const abrirComprobantePago = async (archivo: RegistroFlexible) => {
@@ -626,7 +747,7 @@ export default function KardexTrabajadorPage() {
         <section className="panel">
           <div className="panel-header">
             <div>
-              <h2>Registrar pago</h2>
+              <h2>{pagoEditandoId ? "Editar pago" : "Registrar pago"}</h2>
               <p>Sueldo, bonos, horas extra, descuentos y otros conceptos.</p>
             </div>
             <button
@@ -721,7 +842,13 @@ export default function KardexTrabajadorPage() {
                 </select>
               </CampoPago>
 
-              <CampoPago label="Comprobante bancario">
+              <CampoPago
+                label={
+                  pagoEditandoId && comprobantesPago[pagoEditandoId]?.length
+                    ? "Nuevo comprobante (opcional)"
+                    : "Comprobante bancario"
+                }
+              >
                 <input
                   id="comprobante-pago"
                   type="file"
@@ -757,7 +884,7 @@ export default function KardexTrabajadorPage() {
               <div className="acciones-pago">
                 <button
                   className="btn-secundario"
-                  onClick={() => setMostrarPago(false)}
+                  onClick={pagoEditandoId ? cancelarEdicionPago : () => setMostrarPago(false)}
                   disabled={guardandoPago}
                 >
                   Cancelar
@@ -767,7 +894,11 @@ export default function KardexTrabajadorPage() {
                   onClick={guardarPago}
                   disabled={guardandoPago}
                 >
-                  {guardandoPago ? "Guardando..." : "Guardar pago"}
+                  {guardandoPago
+                    ? "Guardando..."
+                    : pagoEditandoId
+                      ? "Guardar cambios"
+                      : "Guardar pago"}
                 </button>
               </div>
             </div>
@@ -782,6 +913,8 @@ export default function KardexTrabajadorPage() {
           vacio="No hay pagos registrados."
           comprobantes={comprobantesPago}
           onVerComprobante={abrirComprobantePago}
+          onEditarPago={editarPago}
+          onEliminarPago={eliminarPago}
         />
 
         <SeccionHistorial
@@ -882,6 +1015,8 @@ function SeccionHistorial({
   esAsignacion = false,
   comprobantes,
   onVerComprobante,
+  onEditarPago,
+  onEliminarPago,
 }: {
   titulo: string;
   subtitulo: string;
@@ -891,6 +1026,8 @@ function SeccionHistorial({
   esAsignacion?: boolean;
   comprobantes?: Record<string, RegistroFlexible[]>;
   onVerComprobante?: (archivo: RegistroFlexible) => void;
+  onEditarPago?: (item: RegistroFlexible) => void;
+  onEliminarPago?: (item: RegistroFlexible) => void;
 }) {
   return (
     <section className="panel">
@@ -965,6 +1102,16 @@ function SeccionHistorial({
                       Ver comprobante
                     </button>
                   ) : null}
+                  {esPagoPersonal && onEditarPago ? (
+                    <button className="btn-editar-pago" onClick={() => onEditarPago(item)}>
+                      Editar
+                    </button>
+                  ) : null}
+                  {esPagoPersonal && onEliminarPago ? (
+                    <button className="btn-eliminar-pago" onClick={() => onEliminarPago(item)}>
+                      Eliminar
+                    </button>
+                  ) : null}
                 </div>
               </div>
             );
@@ -1031,6 +1178,16 @@ function Estilos() {
         border: 1px solid #bfd6c7; background: #edf7f0; color: #176b3a;
         border-radius: 7px; padding: 6px 9px; font-size: 10px;
         font-weight: 800; cursor: pointer; font-family: inherit; white-space: nowrap;
+      }
+      .btn-editar-pago, .btn-eliminar-pago {
+        border-radius: 7px; padding: 6px 9px; font-size: 10px;
+        font-weight: 800; cursor: pointer; font-family: inherit; white-space: nowrap;
+      }
+      .btn-editar-pago {
+        border: 1px solid #c9d2d8; background: #f5f7f8; color: #34454f;
+      }
+      .btn-eliminar-pago {
+        border: 1px solid #efc7c7; background: #fff4f4; color: #a62b2b;
       }
       .campo-pago-observaciones { grid-column: span 3; }
       .pago-neto {
