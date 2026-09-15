@@ -761,15 +761,96 @@ export default function FichaMaquinariaPage() {
   function estadoServicio(item: ServicioProgramado) {
     if (item.completado) return "Completado";
 
-    const hoy = new Date().toISOString().split("T")[0];
-    const vencidoFecha = !!item.proxima_fecha && item.proxima_fecha <= hoy;
-    const vencidoLectura =
+    const ahora = new Date();
+    const hoyLocal = new Date(
+      ahora.getFullYear(),
+      ahora.getMonth(),
+      ahora.getDate()
+    );
+
+    let diasRestantes: number | null = null;
+
+    if (item.proxima_fecha) {
+      const [anio, mes, dia] = item.proxima_fecha.split("-").map(Number);
+      const fechaServicio = new Date(anio, mes - 1, dia);
+      diasRestantes = Math.ceil(
+        (fechaServicio.getTime() - hoyLocal.getTime()) / 86400000
+      );
+    }
+
+    let lecturaRestante: number | null = null;
+
+    if (
       item.proxima_lectura !== null &&
       item.proxima_lectura !== undefined &&
-      maquina !== null &&
-      Number(maquina.lectura_actual || 0) >= Number(item.proxima_lectura);
+      maquina !== null
+    ) {
+      lecturaRestante =
+        Number(item.proxima_lectura) - Number(maquina.lectura_actual || 0);
+    }
 
-    return vencidoFecha || vencidoLectura ? "Vencido / por realizar" : "Pendiente";
+    const realizarAhora =
+      (diasRestantes !== null && diasRestantes <= 0) ||
+      (lecturaRestante !== null && lecturaRestante <= 0);
+
+    if (realizarAhora) return "Realizar ahora";
+
+    const proximo =
+      (diasRestantes !== null && diasRestantes <= 10) ||
+      (lecturaRestante !== null && lecturaRestante <= 20);
+
+    if (proximo) return "Próximo";
+
+    return "Pendiente";
+  }
+
+  function detalleAlertaServicio(item: ServicioProgramado) {
+    if (item.completado) return "Servicio completado";
+
+    const partes: string[] = [];
+
+    if (item.proxima_fecha) {
+      const ahora = new Date();
+      const hoyLocal = new Date(
+        ahora.getFullYear(),
+        ahora.getMonth(),
+        ahora.getDate()
+      );
+      const [anio, mes, dia] = item.proxima_fecha.split("-").map(Number);
+      const fechaServicio = new Date(anio, mes - 1, dia);
+      const dias = Math.ceil(
+        (fechaServicio.getTime() - hoyLocal.getTime()) / 86400000
+      );
+
+      if (dias > 1) partes.push(`faltan ${dias} días`);
+      else if (dias === 1) partes.push("falta 1 día");
+      else if (dias === 0) partes.push("vence hoy");
+      else if (dias === -1) partes.push("vencido hace 1 día");
+      else partes.push(`vencido hace ${Math.abs(dias)} días`);
+    }
+
+    if (
+      item.proxima_lectura !== null &&
+      item.proxima_lectura !== undefined &&
+      maquina !== null
+    ) {
+      const diferencia =
+        Number(item.proxima_lectura) - Number(maquina.lectura_actual || 0);
+
+      if (diferencia > 0) {
+        partes.push(
+          `faltan ${Number(diferencia).toLocaleString("es-BO")} ${unidadLectura()}`
+        );
+      } else if (diferencia === 0) {
+        partes.push(`lectura alcanzada`);
+      } else {
+        partes.push(
+          `superado por ${Math.abs(diferencia).toLocaleString("es-BO")} ${unidadLectura()}`
+        );
+      }
+    }
+
+    return partes.join(" · ");
   }
 
   function etiquetaEstado(estado: Maquinaria["estado"]) {
@@ -1861,17 +1942,28 @@ export default function FichaMaquinariaPage() {
                                   ).toLocaleString("es-BO")} ${unidadLectura()}`}
                             </td>
                             <td data-label="Estado">
-                              <span
-                                className={`estado-servicio ${
-                                  estadoServicio(item) === "Pendiente"
-                                    ? "estado-servicio-pendiente"
-                                    : estadoServicio(item) === "Completado"
-                                    ? "estado-servicio-completado"
-                                    : "estado-servicio-vencido"
-                                }`}
-                              >
-                                {estadoServicio(item)}
-                              </span>
+                              <div className="estado-servicio-contenedor">
+                                <span
+                                  className={`estado-servicio ${
+                                    estadoServicio(item) === "Pendiente"
+                                      ? "estado-servicio-pendiente"
+                                      : estadoServicio(item) === "Próximo"
+                                      ? "estado-servicio-proximo"
+                                      : estadoServicio(item) === "Completado"
+                                      ? "estado-servicio-completado"
+                                      : "estado-servicio-vencido"
+                                  }`}
+                                >
+                                  {estadoServicio(item) === "Próximo" && "⚠️ "}
+                                  {estadoServicio(item) === "Realizar ahora" && "🔴 "}
+                                  {estadoServicio(item)}
+                                </span>
+                                {!item.completado && (
+                                  <small className="detalle-alerta">
+                                    {detalleAlertaServicio(item)}
+                                  </small>
+                                )}
+                              </div>
                             </td>
                             <td data-label="Observación">
                               {item.observaciones || "—"}
@@ -2761,7 +2853,25 @@ const estilos = `
     white-space: nowrap;
   }
 
+  .estado-servicio-contenedor {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+  }
+
+  .detalle-alerta {
+    color: #758078;
+    font-size: 10px;
+    line-height: 1.35;
+  }
+
   .estado-servicio-pendiente {
+    background: #edf5ef;
+    color: #2d6b41;
+  }
+
+  .estado-servicio-proximo {
     background: #fff5dd;
     color: #946813;
   }
