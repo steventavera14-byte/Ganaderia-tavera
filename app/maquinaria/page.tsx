@@ -366,7 +366,9 @@ export default function MaquinariaPage() {
         <div className="encabezado">
           <div>
             <div className="eyebrow">OPERACIÓN DE LA FINCA</div>
+
             <h1>Maquinaria</h1>
+
             <p>
               Control de tractores, vehículos, implementos y equipos de la
               ganadería.
@@ -651,6 +653,7 @@ export default function MaquinariaPage() {
           <div className="titulo-panel lista-titulo">
             <div>
               <h2>Inventario de maquinaria</h2>
+
               <p>
                 Equipos y vehículos registrados en Ganadería Tavera.
               </p>
@@ -665,12 +668,17 @@ export default function MaquinariaPage() {
           {maquinarias.length === 0 ? (
             <div className="vacio">
               <div className="vacio-icono">🚜</div>
+
               <h3>No hay maquinaria registrada</h3>
+
               <p>
                 Registra el primer tractor, vehículo o equipo de la finca.
               </p>
 
-              <button className="boton-principal" onClick={nuevaMaquina}>
+              <button
+                className="boton-principal"
+                onClick={nuevaMaquina}
+              >
                 + Registrar maquinaria
               </button>
             </div>
@@ -726,7 +734,9 @@ export default function MaquinariaPage() {
                           ? "—"
                           : `${Number(
                               maquina.lectura_actual || 0
-                            ).toLocaleString("es-BO")} ${etiquetaMedicion(
+                            ).toLocaleString(
+                              "es-BO"
+                            )} ${etiquetaMedicion(
                               maquina.tipo_medicion
                             )}`}
                       </strong>
@@ -757,9 +767,11 @@ export default function MaquinariaPage() {
                   <div className="acciones-maquina">
                     <button
                       className="boton-editar"
-                      onClick={() => editarMaquina(maquina)}
+                      onClick={() =>
+                        router.push(`/maquinaria/${maquina.id}`)
+                      }
                     >
-                      Editar / Ficha
+                      Ver ficha
                     </button>
                   </div>
                 </article>
