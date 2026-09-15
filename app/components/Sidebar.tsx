@@ -91,7 +91,7 @@ export default function Sidebar() {
     {
       texto: "Gastos",
       icono: "$",
-      ruta: null,
+      ruta: "/gastos",
     },
     {
       texto: "Reportes",
