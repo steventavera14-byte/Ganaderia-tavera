@@ -108,6 +108,22 @@ export default function KardexTrabajadorPage() {
   const [pagos, setPagos] = useState<RegistroFlexible[]>([]);
   const [costos, setCostos] = useState<RegistroFlexible[]>([]);
   const [asignaciones, setAsignaciones] = useState<RegistroFlexible[]>([]);
+  const [mostrarPago, setMostrarPago] = useState(false);
+  const [guardandoPago, setGuardandoPago] = useState(false);
+  const [mensaje, setMensaje] = useState("");
+  const [pago, setPago] = useState({
+    fecha_pago: new Date().toISOString().slice(0, 10),
+    periodo_desde: "",
+    periodo_hasta: "",
+    salario: "",
+    bonos: "0",
+    horas_extra: "0",
+    descuentos: "0",
+    otros: "0",
+    moneda: "BOB",
+    metodo_pago: "",
+    observaciones: "",
+  });
 
   useEffect(() => {
     if (trabajadorId) iniciar();
@@ -155,7 +171,13 @@ export default function KardexTrabajadorPage() {
       return;
     }
 
-    setTrabajador(persona as Trabajador);
+    const trabajadorCargado = persona as Trabajador;
+    setTrabajador(trabajadorCargado);
+    setPago((anterior) => ({
+      ...anterior,
+      salario: String(trabajadorCargado.salario_base ?? 0),
+      moneda: trabajadorCargado.moneda || "BOB",
+    }));
 
     const resultados = await Promise.all([
       supabase
@@ -219,9 +241,13 @@ export default function KardexTrabajadorPage() {
   const totalPagos = useMemo(
     () =>
       pagos.reduce((suma, item) => {
-        const valor =
-          item.monto ?? item.total ?? item.importe ?? item.valor ?? item.monto_pagado;
-        return suma + (Number(valor) || 0);
+        const neto =
+          Number(item.salario ?? 0) +
+          Number(item.bonos ?? 0) +
+          Number(item.horas_extra ?? 0) +
+          Number(item.otros ?? 0) -
+          Number(item.descuentos ?? 0);
+        return suma + neto;
       }, 0),
     [pagos]
   );
@@ -234,6 +260,84 @@ export default function KardexTrabajadorPage() {
       }, 0),
     [costos]
   );
+
+  const guardarPago = async () => {
+    if (!trabajador) return;
+
+    setError("");
+    setMensaje("");
+
+    const salario = Number(pago.salario || 0);
+    const bonos = Number(pago.bonos || 0);
+    const horasExtra = Number(pago.horas_extra || 0);
+    const descuentos = Number(pago.descuentos || 0);
+    const otros = Number(pago.otros || 0);
+
+    if (!pago.fecha_pago) {
+      setError("La fecha de pago es obligatoria.");
+      return;
+    }
+
+    if ([salario, bonos, horasExtra, descuentos, otros].some((n) => Number.isNaN(n) || n < 0)) {
+      setError("Los importes deben ser números iguales o mayores a 0.");
+      return;
+    }
+
+    setGuardandoPago(true);
+
+    const { error: errorPago } = await supabase.rpc(
+      "gan_registrar_pago_personal",
+      {
+        p_trabajador_id: trabajador.id,
+        p_fecha_pago: pago.fecha_pago,
+        p_periodo_desde: pago.periodo_desde || null,
+        p_periodo_hasta: pago.periodo_hasta || null,
+        p_salario: salario,
+        p_bonos: bonos,
+        p_horas_extra: horasExtra,
+        p_descuentos: descuentos,
+        p_otros: otros,
+        p_moneda: pago.moneda,
+        p_metodo_pago: pago.metodo_pago.trim() || null,
+        p_observaciones: pago.observaciones.trim() || null,
+      }
+    );
+
+    if (errorPago) {
+      setError(`No se pudo registrar el pago: ${errorPago.message}`);
+      setGuardandoPago(false);
+      return;
+    }
+
+    const { data: pagosActualizados, error: errorRecarga } = await supabase
+      .from("gan_pagos_personal")
+      .select("*")
+      .eq("trabajador_id", trabajador.id)
+      .order("created_at", { ascending: false });
+
+    if (errorRecarga) {
+      setError(`El pago fue registrado, pero no se pudo actualizar el historial: ${errorRecarga.message}`);
+    } else {
+      setPagos((pagosActualizados || []) as RegistroFlexible[]);
+      setMensaje("Pago registrado correctamente.");
+    }
+
+    setPago({
+      fecha_pago: new Date().toISOString().slice(0, 10),
+      periodo_desde: "",
+      periodo_hasta: "",
+      salario: String(trabajador.salario_base ?? 0),
+      bonos: "0",
+      horas_extra: "0",
+      descuentos: "0",
+      otros: "0",
+      moneda: trabajador.moneda || "BOB",
+      metodo_pago: "",
+      observaciones: "",
+    });
+    setMostrarPago(false);
+    setGuardandoPago(false);
+  };
 
   const abrirDocumento = async (archivo: Archivo) => {
     setError("");
@@ -297,6 +401,7 @@ export default function KardexTrabajadorPage() {
         </div>
 
         {error && <div className="alerta error">{error}</div>}
+        {mensaje && <div className="alerta exito">{mensaje}</div>}
 
         <section className="cabecera-kardex">
           <div className="avatar-grande">
@@ -400,6 +505,147 @@ export default function KardexTrabajadorPage() {
           </div>
         </section>
 
+        <section className="panel">
+          <div className="panel-header">
+            <div>
+              <h2>Registrar pago</h2>
+              <p>Sueldo, bonos, horas extra, descuentos y otros conceptos.</p>
+            </div>
+            <button
+              className={mostrarPago ? "btn-secundario" : "btn-pago"}
+              onClick={() => {
+                setMostrarPago((valor) => !valor);
+                setError("");
+                setMensaje("");
+              }}
+            >
+              {mostrarPago ? "Cerrar" : "+ Registrar pago"}
+            </button>
+          </div>
+
+          {mostrarPago && (
+            <div className="pago-form">
+              <CampoPago label="Fecha de pago">
+                <input
+                  type="date"
+                  value={pago.fecha_pago}
+                  onChange={(e) => setPago({ ...pago, fecha_pago: e.target.value })}
+                />
+              </CampoPago>
+              <CampoPago label="Período desde">
+                <input
+                  type="date"
+                  value={pago.periodo_desde}
+                  onChange={(e) => setPago({ ...pago, periodo_desde: e.target.value })}
+                />
+              </CampoPago>
+              <CampoPago label="Período hasta">
+                <input
+                  type="date"
+                  value={pago.periodo_hasta}
+                  onChange={(e) => setPago({ ...pago, periodo_hasta: e.target.value })}
+                />
+              </CampoPago>
+              <CampoPago label="Salario">
+                <input
+                  type="number" min="0" step="0.01"
+                  value={pago.salario}
+                  onChange={(e) => setPago({ ...pago, salario: e.target.value })}
+                />
+              </CampoPago>
+              <CampoPago label="Bonos">
+                <input
+                  type="number" min="0" step="0.01"
+                  value={pago.bonos}
+                  onChange={(e) => setPago({ ...pago, bonos: e.target.value })}
+                />
+              </CampoPago>
+              <CampoPago label="Horas extra">
+                <input
+                  type="number" min="0" step="0.01"
+                  value={pago.horas_extra}
+                  onChange={(e) => setPago({ ...pago, horas_extra: e.target.value })}
+                />
+              </CampoPago>
+              <CampoPago label="Descuentos">
+                <input
+                  type="number" min="0" step="0.01"
+                  value={pago.descuentos}
+                  onChange={(e) => setPago({ ...pago, descuentos: e.target.value })}
+                />
+              </CampoPago>
+              <CampoPago label="Otros">
+                <input
+                  type="number" min="0" step="0.01"
+                  value={pago.otros}
+                  onChange={(e) => setPago({ ...pago, otros: e.target.value })}
+                />
+              </CampoPago>
+              <CampoPago label="Moneda">
+                <select
+                  value={pago.moneda}
+                  onChange={(e) => setPago({ ...pago, moneda: e.target.value })}
+                >
+                  <option value="BOB">BOB - Bolivianos</option>
+                  <option value="USD">USD - Dólares</option>
+                </select>
+              </CampoPago>
+              <CampoPago label="Método de pago">
+                <select
+                  value={pago.metodo_pago}
+                  onChange={(e) => setPago({ ...pago, metodo_pago: e.target.value })}
+                >
+                  <option value="">Seleccionar</option>
+                  <option value="efectivo">Efectivo</option>
+                  <option value="transferencia">Transferencia</option>
+                  <option value="cheque">Cheque</option>
+                  <option value="otro">Otro</option>
+                </select>
+              </CampoPago>
+
+              <div className="campo-pago campo-pago-observaciones">
+                <label>Observaciones</label>
+                <textarea
+                  value={pago.observaciones}
+                  onChange={(e) => setPago({ ...pago, observaciones: e.target.value })}
+                  placeholder="Opcional"
+                />
+              </div>
+
+              <div className="pago-neto">
+                <span>Pago neto</span>
+                <strong>
+                  {moneda(
+                    Number(pago.salario || 0) +
+                      Number(pago.bonos || 0) +
+                      Number(pago.horas_extra || 0) +
+                      Number(pago.otros || 0) -
+                      Number(pago.descuentos || 0),
+                    pago.moneda
+                  )}
+                </strong>
+              </div>
+
+              <div className="acciones-pago">
+                <button
+                  className="btn-secundario"
+                  onClick={() => setMostrarPago(false)}
+                  disabled={guardandoPago}
+                >
+                  Cancelar
+                </button>
+                <button
+                  className="btn-pago"
+                  onClick={guardarPago}
+                  disabled={guardandoPago}
+                >
+                  {guardandoPago ? "Guardando..." : "Guardar pago"}
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+
         <SeccionHistorial
           titulo="Pagos"
           subtitulo="Historial de pagos registrados al trabajador."
@@ -457,6 +703,21 @@ export default function KardexTrabajadorPage() {
       </main>
       <Estilos />
     </>
+  );
+}
+
+function CampoPago({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="campo-pago">
+      <label>{label}</label>
+      {children}
+    </div>
   );
 }
 
@@ -524,14 +785,25 @@ function SeccionHistorial({
               item.actividad ??
               item.funcion ??
               item.tarea ??
-              (esAsignacion ? "Asignación" : "Registro");
-            const valor =
-              item.monto ??
-              item.total ??
-              item.importe ??
-              item.valor ??
-              item.costo ??
-              item.monto_pagado;
+              (item.salario !== undefined ? "Pago de personal" : esAsignacion ? "Asignación" : "Registro");
+            const esPagoPersonal =
+              item.salario !== undefined ||
+              item.bonos !== undefined ||
+              item.horas_extra !== undefined ||
+              item.descuentos !== undefined ||
+              item.otros !== undefined;
+            const valor = esPagoPersonal
+              ? Number(item.salario ?? 0) +
+                Number(item.bonos ?? 0) +
+                Number(item.horas_extra ?? 0) +
+                Number(item.otros ?? 0) -
+                Number(item.descuentos ?? 0)
+              : item.monto ??
+                item.total ??
+                item.importe ??
+                item.valor ??
+                item.costo ??
+                item.monto_pagado;
             const mon = item.moneda ?? monedaBase;
             const estado = item.estado;
 
@@ -584,6 +856,43 @@ function Estilos() {
       .editar { border: 0; background: #176b3a; color: white; }
       .alerta { padding: 12px 14px; border-radius: 9px; margin-bottom: 18px; font-size: 13px; }
       .alerta.error { background: #fdecec; color: #b42318; }
+      .alerta.exito { background: #eaf7ee; color: #176b3a; }
+      .btn-pago {
+        border: 0; background: #176b3a; color: white; border-radius: 8px;
+        padding: 9px 13px; font-weight: 700; font-size: 11px; cursor: pointer;
+        font-family: inherit;
+      }
+      .btn-pago:disabled { opacity: .6; cursor: default; }
+      .btn-secundario {
+        border: 1px solid #d4ddd7; background: white; color: #53665a;
+        border-radius: 8px; padding: 9px 13px; font-weight: 700;
+        font-size: 11px; cursor: pointer; font-family: inherit;
+      }
+      .pago-form {
+        padding: 20px; display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px;
+      }
+      .campo-pago { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+      .campo-pago label {
+        font-size: 10px; font-weight: 800; color: #66786d; text-transform: uppercase;
+      }
+      .campo-pago input, .campo-pago select, .campo-pago textarea {
+        width: 100%; border: 1px solid #d3ddd6; border-radius: 8px;
+        background: white; color: #1d2c23; font-family: inherit; outline: none;
+      }
+      .campo-pago input, .campo-pago select { height: 42px; padding: 0 10px; }
+      .campo-pago textarea { min-height: 80px; padding: 10px; resize: vertical; }
+      .campo-pago-observaciones { grid-column: span 3; }
+      .pago-neto {
+        background: #edf7f0; border-radius: 9px; padding: 12px 14px;
+        display: flex; flex-direction: column; justify-content: center; gap: 5px;
+      }
+      .pago-neto span { font-size: 10px; color: #66786d; font-weight: 800; text-transform: uppercase; }
+      .pago-neto strong { font-size: 18px; color: #176b3a; }
+      .acciones-pago {
+        grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 9px;
+        padding-top: 4px;
+      }
       .cabecera-kardex {
         background: white; border: 1px solid #dce5df; border-radius: 16px;
         padding: 24px; display: flex; align-items: center; gap: 18px;
@@ -676,6 +985,8 @@ function Estilos() {
         .kardex-main { padding: 24px; }
         .grid-principal { grid-template-columns: 1fr; }
         .datos-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .pago-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .campo-pago-observaciones { grid-column: span 1; }
       }
 
       @media (max-width: 820px) {
@@ -703,6 +1014,12 @@ function Estilos() {
         .nota { padding: 0 15px 15px; }
         .historial, .documentos { padding: 0 15px; }
         .historial-item, .documento { align-items: flex-start; }
+        .pago-form { padding: 15px; grid-template-columns: 1fr; }
+        .campo-pago-observaciones { grid-column: span 1; }
+        .campo-pago input, .campo-pago select { height: 46px; font-size: 16px; }
+        .campo-pago textarea { font-size: 16px; }
+        .acciones-pago { display: grid; grid-template-columns: 1fr 1fr; }
+        .acciones-pago button { min-height: 44px; }
       }
 
       @media (max-width: 430px) {
