@@ -40,6 +40,21 @@ type Gasto = {
   created_at: string;
 };
 
+type ReferenciaCosto = {
+  id: string;
+  nombre: string;
+};
+
+type AsignacionGasto = {
+  id: string;
+  gasto_id: string;
+  tipo_asignacion: string;
+  referencia_id: string | null;
+  porcentaje: number;
+  monto_asignado: number;
+  observaciones: string | null;
+};
+
 const categorias = [
   ["ganado", "Ganado"],
   ["alimentacion", "Alimentación"],
@@ -100,6 +115,19 @@ export default function GastosPage() {
   const [provRubro, setProvRubro] = useState("");
   const [provObservaciones, setProvObservaciones] = useState("");
 
+  const [asignaciones, setAsignaciones] = useState<AsignacionGasto[]>([]);
+  const [lotes, setLotes] = useState<ReferenciaCosto[]>([]);
+  const [potreros, setPotreros] = useState<ReferenciaCosto[]>([]);
+  const [maquinas, setMaquinas] = useState<ReferenciaCosto[]>([]);
+  const [trabajadores, setTrabajadores] = useState<ReferenciaCosto[]>([]);
+  const [gastoAsignando, setGastoAsignando] = useState<Gasto | null>(null);
+  const [tipoAsignacion, setTipoAsignacion] = useState("general");
+  const [referenciaAsignacionId, setReferenciaAsignacionId] = useState("");
+  const [porcentajeAsignacion, setPorcentajeAsignacion] = useState("100");
+  const [observacionAsignacion, setObservacionAsignacion] = useState("");
+  const [guardandoAsignacion, setGuardandoAsignacion] = useState(false);
+  const [eliminandoAsignacionId, setEliminandoAsignacionId] = useState<string | null>(null);
+
   const [fecha, setFecha] = useState(hoyLocal());
   const [descripcion, setDescripcion] = useState("");
   const [categoria, setCategoria] = useState("ganado");
@@ -127,7 +155,16 @@ export default function GastosPage() {
     setCargando(true);
     setError("");
 
-    const [gastosRes, centrosRes, proveedoresRes] = await Promise.all([
+    const [
+      gastosRes,
+      centrosRes,
+      proveedoresRes,
+      asignacionesRes,
+      lotesRes,
+      potrerosRes,
+      maquinasRes,
+      trabajadoresRes,
+    ] = await Promise.all([
       supabase
         .from("gan_gastos")
         .select("*")
@@ -145,19 +182,52 @@ export default function GastosPage() {
         .select("id,nombre,nit,telefono,email,direccion,rubro,activo,observaciones")
         .eq("finca_id", FINCA_ID)
         .order("nombre"),
+      supabase
+        .from("gan_gasto_asignaciones")
+        .select("id,gasto_id,tipo_asignacion,referencia_id,porcentaje,monto_asignado,observaciones"),
+      supabase
+        .from("gan_lotes_ganado")
+        .select("id,nombre")
+        .eq("finca_id", FINCA_ID)
+        .order("nombre"),
+      supabase
+        .from("gan_potreros")
+        .select("id,nombre")
+        .eq("finca_id", FINCA_ID)
+        .order("nombre"),
+      supabase
+        .from("gan_maquinaria")
+        .select("id,nombre")
+        .eq("finca_id", FINCA_ID)
+        .order("nombre"),
+      supabase
+        .from("gan_trabajadores")
+        .select("id,nombre")
+        .eq("finca_id", FINCA_ID)
+        .order("nombre"),
     ]);
 
-    if (gastosRes.error || centrosRes.error || proveedoresRes.error) {
-      setError(
-        gastosRes.error?.message ||
-          centrosRes.error?.message ||
-          proveedoresRes.error?.message ||
-          "No se pudieron cargar los datos."
-      );
+    const primerError =
+      gastosRes.error ||
+      centrosRes.error ||
+      proveedoresRes.error ||
+      asignacionesRes.error ||
+      lotesRes.error ||
+      potrerosRes.error ||
+      maquinasRes.error ||
+      trabajadoresRes.error;
+
+    if (primerError) {
+      setError(primerError.message || "No se pudieron cargar los datos.");
     } else {
       setGastos((gastosRes.data || []) as Gasto[]);
       setCentros((centrosRes.data || []) as CentroCosto[]);
       setProveedores((proveedoresRes.data || []) as Proveedor[]);
+      setAsignaciones((asignacionesRes.data || []) as AsignacionGasto[]);
+      setLotes((lotesRes.data || []) as ReferenciaCosto[]);
+      setPotreros((potrerosRes.data || []) as ReferenciaCosto[]);
+      setMaquinas((maquinasRes.data || []) as ReferenciaCosto[]);
+      setTrabajadores((trabajadoresRes.data || []) as ReferenciaCosto[]);
     }
 
     setCargando(false);
@@ -405,6 +475,126 @@ export default function GastosPage() {
     setCambiandoProveedorId(null);
   };
 
+  const abrirAsignacion = (gasto: Gasto) => {
+    setGastoAsignando(gasto);
+    setTipoAsignacion("general");
+    setReferenciaAsignacionId("");
+    setPorcentajeAsignacion("100");
+    setObservacionAsignacion("");
+    setMensaje("");
+    setError("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const referenciasDisponibles = () => {
+    if (tipoAsignacion === "lote") return lotes;
+    if (tipoAsignacion === "potrero") return potreros;
+    if (tipoAsignacion === "maquinaria") return maquinas;
+    if (tipoAsignacion === "trabajador") return trabajadores;
+    return [];
+  };
+
+  const nombreReferencia = (tipo: string, id: string | null) => {
+    if (tipo === "general") return "General";
+    if (!id) return "—";
+    const fuente =
+      tipo === "lote"
+        ? lotes
+        : tipo === "potrero"
+        ? potreros
+        : tipo === "maquinaria"
+        ? maquinas
+        : tipo === "trabajador"
+        ? trabajadores
+        : [];
+    return fuente.find((item) => item.id === id)?.nombre || "—";
+  };
+
+  const guardarAsignacion = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!gastoAsignando) return;
+
+    const porcentaje = Number(porcentajeAsignacion);
+    if (
+      Number.isNaN(porcentaje) ||
+      porcentaje <= 0 ||
+      porcentaje > 100
+    ) {
+      setError("El porcentaje debe ser mayor a 0 y máximo 100.");
+      return;
+    }
+
+    if (tipoAsignacion !== "general" && !referenciaAsignacionId) {
+      setError("Selecciona el destino del gasto.");
+      return;
+    }
+
+    const yaAsignado = asignaciones
+      .filter((a) => a.gasto_id === gastoAsignando.id)
+      .reduce((suma, a) => suma + Number(a.porcentaje), 0);
+
+    if (yaAsignado + porcentaje > 100.0001) {
+      setError(
+        `Este gasto ya tiene ${formatoNumero(yaAsignado)}% asignado. El total no puede superar 100%.`
+      );
+      return;
+    }
+
+    setGuardandoAsignacion(true);
+    setMensaje("");
+    setError("");
+
+    const { error: rpcError } = await supabase.rpc("gan_asignar_gasto", {
+      p_gasto_id: gastoAsignando.id,
+      p_tipo_asignacion: tipoAsignacion,
+      p_referencia_id:
+        tipoAsignacion === "general" ? null : referenciaAsignacionId,
+      p_porcentaje: porcentaje,
+      p_monto_asignado: null,
+      p_observaciones: observacionAsignacion.trim() || null,
+    });
+
+    if (rpcError) {
+      setError(rpcError.message);
+      setGuardandoAsignacion(false);
+      return;
+    }
+
+    setTipoAsignacion("general");
+    setReferenciaAsignacionId("");
+    setPorcentajeAsignacion("100");
+    setObservacionAsignacion("");
+    setMensaje("Asignación guardada correctamente.");
+    await cargarDatos();
+    setGuardandoAsignacion(false);
+  };
+
+  const eliminarAsignacion = async (asignacion: AsignacionGasto) => {
+    if (!window.confirm("¿Eliminar esta asignación del gasto?")) return;
+
+    setEliminandoAsignacionId(asignacion.id);
+    setMensaje("");
+    setError("");
+
+    const { error: rpcError } = await supabase.rpc(
+      "gan_eliminar_asignacion_gasto",
+      { p_asignacion_id: asignacion.id }
+    );
+
+    if (rpcError) {
+      setError(rpcError.message);
+      setEliminandoAsignacionId(null);
+      return;
+    }
+
+    setMensaje("Asignación eliminada correctamente.");
+    await cargarDatos();
+    setEliminandoAsignacionId(null);
+  };
+
+  const asignacionesDeGasto = (gastoId: string) =>
+    asignaciones.filter((a) => a.gasto_id === gastoId);
+
   const gastosFiltrados = useMemo(() => {
     const texto = busqueda.trim().toLowerCase();
 
@@ -643,6 +833,141 @@ export default function GastosPage() {
                 </button>
               </div>
             </form>
+          </section>
+        )}
+
+        {gastoAsignando && (
+          <section style={estilos.panel}>
+            <div style={estilos.panelCabecera}>
+              <div>
+                <div style={estilos.panelTitulo}>Asignar gasto</div>
+                <div style={estilos.panelSubtitulo}>
+                  {gastoAsignando.descripcion} —{" "}
+                  {gastoAsignando.moneda === "BOB" ? "Bs" : "USD"}{" "}
+                  {formatoNumero(Number(gastoAsignando.monto))}
+                </div>
+              </div>
+              <button
+                type="button"
+                style={estilos.botonSecundario}
+                onClick={() => setGastoAsignando(null)}
+              >
+                Cerrar
+              </button>
+            </div>
+
+            <form onSubmit={guardarAsignacion}>
+              <div style={estilos.formGrid}>
+                <Campo label="Destino">
+                  <select
+                    value={tipoAsignacion}
+                    onChange={(e) => {
+                      setTipoAsignacion(e.target.value);
+                      setReferenciaAsignacionId("");
+                    }}
+                    style={estilos.input}
+                  >
+                    <option value="general">General</option>
+                    <option value="lote">Lote</option>
+                    <option value="potrero">Potrero</option>
+                    <option value="maquinaria">Maquinaria</option>
+                    <option value="trabajador">Trabajador</option>
+                  </select>
+                </Campo>
+
+                {tipoAsignacion !== "general" && (
+                  <Campo label="Seleccionar">
+                    <select
+                      value={referenciaAsignacionId}
+                      onChange={(e) => setReferenciaAsignacionId(e.target.value)}
+                      style={estilos.input}
+                      required
+                    >
+                      <option value="">Seleccionar...</option>
+                      {referenciasDisponibles().map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </Campo>
+                )}
+
+                <Campo label="Porcentaje">
+                  <input
+                    type="number"
+                    min="0.01"
+                    max="100"
+                    step="0.01"
+                    value={porcentajeAsignacion}
+                    onChange={(e) => setPorcentajeAsignacion(e.target.value)}
+                    style={estilos.input}
+                    required
+                  />
+                </Campo>
+
+                <Campo label="Observaciones">
+                  <input
+                    value={observacionAsignacion}
+                    onChange={(e) => setObservacionAsignacion(e.target.value)}
+                    placeholder="Opcional"
+                    style={estilos.input}
+                  />
+                </Campo>
+              </div>
+
+              <div style={estilos.accionesFormulario}>
+                <button
+                  type="submit"
+                  disabled={guardandoAsignacion}
+                  style={{
+                    ...estilos.botonPrincipal,
+                    opacity: guardandoAsignacion ? 0.65 : 1,
+                  }}
+                >
+                  {guardandoAsignacion ? "Guardando..." : "Guardar asignación"}
+                </button>
+              </div>
+            </form>
+
+            <div style={estilos.asignacionesActuales}>
+              <div style={estilos.label}>ASIGNACIONES ACTUALES</div>
+              {asignacionesDeGasto(gastoAsignando.id).length === 0 ? (
+                <div style={estilos.asignacionVacia}>
+                  Este gasto todavía no tiene asignaciones.
+                </div>
+              ) : (
+                asignacionesDeGasto(gastoAsignando.id).map((asignacion) => (
+                  <div key={asignacion.id} style={estilos.asignacionFila}>
+                    <div>
+                      <strong style={{ color: "#173c28" }}>
+                        {asignacion.tipo_asignacion === "general"
+                          ? "General"
+                          : `${asignacion.tipo_asignacion.charAt(0).toUpperCase()}${asignacion.tipo_asignacion.slice(1)}: ${nombreReferencia(
+                              asignacion.tipo_asignacion,
+                              asignacion.referencia_id
+                            )}`}
+                      </strong>
+                      <div style={estilos.textoSuave}>
+                        {formatoNumero(Number(asignacion.porcentaje))}% —{" "}
+                        {gastoAsignando.moneda === "BOB" ? "Bs" : "USD"}{" "}
+                        {formatoNumero(Number(asignacion.monto_asignado))}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={eliminandoAsignacionId === asignacion.id}
+                      style={estilos.botonEliminar}
+                      onClick={() => eliminarAsignacion(asignacion)}
+                    >
+                      {eliminandoAsignacionId === asignacion.id
+                        ? "Eliminando..."
+                        : "Quitar"}
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
           </section>
         )}
 
@@ -990,6 +1315,7 @@ export default function GastosPage() {
                     <th style={estilos.th}>Centro</th>
                     <th style={estilos.th}>Proveedor</th>
                     <th style={estilos.th}>Pago</th>
+                    <th style={estilos.th}>Asignación</th>
                     <th style={{ ...estilos.th, textAlign: "right" }}>Monto</th>
                     <th style={{ ...estilos.th, textAlign: "right" }}>Acciones</th>
                   </tr>
@@ -1018,6 +1344,16 @@ export default function GastosPage() {
                         {nombreProveedor(gasto.proveedor_id)}
                       </td>
                       <td style={estilos.td}>{gasto.metodo_pago || "—"}</td>
+                      <td style={estilos.td}>
+                        {asignacionesDeGasto(gasto.id).length === 0
+                          ? "—"
+                          : asignacionesDeGasto(gasto.id)
+                              .map(
+                                (a) =>
+                                  `${a.tipo_asignacion === "general" ? "General" : nombreReferencia(a.tipo_asignacion, a.referencia_id)} (${formatoNumero(Number(a.porcentaje))}%)`
+                              )
+                              .join(" · ")}
+                      </td>
                       <td
                         style={{
                           ...estilos.td,
@@ -1032,7 +1368,14 @@ export default function GastosPage() {
                       <td style={{ ...estilos.td, textAlign: "right", whiteSpace: "nowrap" }}>
                         <button
                           type="button"
-                          style={estilos.botonEditar}
+                          style={estilos.botonAsignar}
+                          onClick={() => abrirAsignacion(gasto)}
+                        >
+                          Asignar
+                        </button>
+                        <button
+                          type="button"
+                          style={{ ...estilos.botonEditar, marginLeft: "6px" }}
                           onClick={() => cargarGastoParaEditar(gasto)}
                         >
                           Editar
@@ -1288,7 +1631,7 @@ const estilos: Record<string, React.CSSProperties> = {
   tabla: {
     width: "100%",
     borderCollapse: "collapse",
-    minWidth: "900px",
+    minWidth: "1040px",
     fontSize: "12px",
   },
   th: {
@@ -1374,6 +1717,45 @@ const estilos: Record<string, React.CSSProperties> = {
     display: "flex",
     gap: "7px",
     marginTop: "11px",
+  },
+  botonAsignar: {
+    border: "1px solid #b9d8c5",
+    borderRadius: "7px",
+    background: "#eaf6ef",
+    color: "#176b3a",
+    padding: "6px 9px",
+    fontSize: "10px",
+    fontWeight: 800,
+    cursor: "pointer",
+    fontFamily: "inherit",
+  },
+  asignacionResumen: {
+    marginTop: "9px",
+    color: "#667a6e",
+    fontSize: "10px",
+    lineHeight: 1.45,
+  },
+  asignacionesActuales: {
+    marginTop: "18px",
+    paddingTop: "15px",
+    borderTop: "1px solid #edf1ef",
+  },
+  asignacionVacia: {
+    marginTop: "8px",
+    color: "#8a9991",
+    fontSize: "11px",
+  },
+  asignacionFila: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: "12px",
+    marginTop: "9px",
+    padding: "10px 12px",
+    border: "1px solid #e5ebe7",
+    borderRadius: "9px",
+    background: "#fafcfb",
+    fontSize: "11px",
   },
   botonEditar: {
     border: "1px solid #cbdcd2",
