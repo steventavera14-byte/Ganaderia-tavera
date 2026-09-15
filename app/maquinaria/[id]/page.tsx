@@ -34,6 +34,20 @@ type Lectura = {
   created_at: string;
 };
 
+type Combustible = {
+  id: string;
+  maquinaria_id: string;
+  fecha: string;
+  tipo_combustible: string;
+  litros: number;
+  precio_litro: number | null;
+  lectura_maquina: number | null;
+  proveedor: string | null;
+  observaciones: string | null;
+  registrado_por: string | null;
+  created_at: string;
+};
+
 export default function FichaMaquinariaPage() {
   const router = useRouter();
   const params = useParams();
@@ -48,18 +62,34 @@ export default function FichaMaquinariaPage() {
 
   const [maquina, setMaquina] = useState<Maquinaria | null>(null);
   const [lecturas, setLecturas] = useState<Lectura[]>([]);
+  const [combustibles, setCombustibles] = useState<Combustible[]>([]);
 
   const [mostrarLecturas, setMostrarLecturas] = useState(false);
   const [mostrarFormularioLectura, setMostrarFormularioLectura] =
     useState(false);
 
+  const [mostrarCombustible, setMostrarCombustible] = useState(false);
+  const [mostrarFormularioCombustible, setMostrarFormularioCombustible] =
+    useState(false);
+
   const [guardandoLectura, setGuardandoLectura] = useState(false);
+  const [guardandoCombustible, setGuardandoCombustible] = useState(false);
 
   const [fechaLectura, setFechaLectura] = useState(
     new Date().toISOString().split("T")[0]
   );
   const [nuevaLectura, setNuevaLectura] = useState("");
   const [observacionLectura, setObservacionLectura] = useState("");
+
+  const [fechaCombustible, setFechaCombustible] = useState(
+    new Date().toISOString().split("T")[0]
+  );
+  const [tipoCombustible, setTipoCombustible] = useState("diesel");
+  const [litrosCombustible, setLitrosCombustible] = useState("");
+  const [precioLitroCombustible, setPrecioLitroCombustible] = useState("");
+  const [lecturaCombustible, setLecturaCombustible] = useState("");
+  const [proveedorCombustible, setProveedorCombustible] = useState("");
+  const [observacionCombustible, setObservacionCombustible] = useState("");
 
   useEffect(() => {
     if (maquinaId) {
@@ -103,6 +133,7 @@ export default function FichaMaquinariaPage() {
 
       await cargarMaquina(membresia.finca_id);
       await cargarLecturas();
+      await cargarCombustibles();
     } catch (err: any) {
       console.error(err);
       setError(
@@ -156,6 +187,23 @@ export default function FichaMaquinariaPage() {
     }
 
     setLecturas((data || []) as Lectura[]);
+  }
+
+  async function cargarCombustibles() {
+    if (!maquinaId) return;
+
+    const { data, error: errorCombustible } = await supabase
+      .from("gan_combustible")
+      .select("*")
+      .eq("maquinaria_id", maquinaId)
+      .order("fecha", { ascending: false })
+      .order("created_at", { ascending: false });
+
+    if (errorCombustible) {
+      throw errorCombustible;
+    }
+
+    setCombustibles((data || []) as Combustible[]);
   }
 
   function abrirLecturas() {
@@ -246,6 +294,171 @@ export default function FichaMaquinariaPage() {
     } finally {
       setGuardandoLectura(false);
     }
+  }
+
+  function abrirCombustible() {
+    setMostrarCombustible(true);
+    setMostrarFormularioCombustible(false);
+    setMensaje("");
+    setError("");
+  }
+
+  function cerrarCombustible() {
+    setMostrarCombustible(false);
+    setMostrarFormularioCombustible(false);
+    setMensaje("");
+    setError("");
+  }
+
+  function abrirNuevoCombustible() {
+    if (!maquina) return;
+
+    setFechaCombustible(new Date().toISOString().split("T")[0]);
+    setTipoCombustible("diesel");
+    setLitrosCombustible("");
+    setPrecioLitroCombustible("");
+    setLecturaCombustible(
+      maquina.tipo_medicion === "ninguno"
+        ? ""
+        : String(maquina.lectura_actual || 0)
+    );
+    setProveedorCombustible("");
+    setObservacionCombustible("");
+    setError("");
+    setMensaje("");
+    setMostrarFormularioCombustible(true);
+  }
+
+  async function registrarCombustible(e: React.FormEvent) {
+    e.preventDefault();
+
+    if (!maquina || !maquinaId) return;
+
+    const litros = Number(litrosCombustible);
+    const precio =
+      precioLitroCombustible.trim() === ""
+        ? null
+        : Number(precioLitroCombustible);
+    const lectura =
+      lecturaCombustible.trim() === ""
+        ? null
+        : Number(lecturaCombustible);
+
+    if (!fechaCombustible) {
+      setError("Selecciona la fecha de la carga.");
+      return;
+    }
+
+    if (!tipoCombustible.trim()) {
+      setError("Ingresa el tipo de combustible.");
+      return;
+    }
+
+    if (!litrosCombustible.trim() || Number.isNaN(litros) || litros <= 0) {
+      setError("Ingresa una cantidad de litros válida.");
+      return;
+    }
+
+    if (precio !== null && (Number.isNaN(precio) || precio < 0)) {
+      setError("Ingresa un precio por litro válido.");
+      return;
+    }
+
+    if (lectura !== null && (Number.isNaN(lectura) || lectura < 0)) {
+      setError("Ingresa una lectura de máquina válida.");
+      return;
+    }
+
+    if (
+      maquina.tipo_medicion !== "ninguno" &&
+      lectura !== null &&
+      lectura < Number(maquina.lectura_actual || 0)
+    ) {
+      setError(
+        `La lectura de la máquina no puede ser menor que ${Number(
+          maquina.lectura_actual || 0
+        ).toLocaleString("es-BO")} ${unidadLectura()}.`
+      );
+      return;
+    }
+
+    try {
+      setGuardandoCombustible(true);
+      setError("");
+      setMensaje("");
+
+      const { error: errorRpc } = await supabase.rpc(
+        "gan_registrar_combustible",
+        {
+          p_maquinaria_id: maquinaId,
+          p_fecha: fechaCombustible,
+          p_tipo_combustible: tipoCombustible.trim(),
+          p_litros: litros,
+          p_precio_litro: precio,
+          p_lectura_maquina: lectura,
+          p_proveedor: proveedorCombustible.trim() || null,
+          p_observaciones: observacionCombustible.trim() || null,
+        }
+      );
+
+      if (errorRpc) {
+        throw errorRpc;
+      }
+
+      await cargarCombustibles();
+
+      setLitrosCombustible("");
+      setPrecioLitroCombustible("");
+      setProveedorCombustible("");
+      setObservacionCombustible("");
+      setMostrarFormularioCombustible(false);
+
+      setMensaje("Carga de combustible registrada correctamente.");
+    } catch (err: any) {
+      console.error(err);
+      setError(
+        err?.message || "No se pudo registrar la carga de combustible."
+      );
+    } finally {
+      setGuardandoCombustible(false);
+    }
+  }
+
+  function totalLitrosCombustible() {
+    return combustibles.reduce(
+      (total, carga) => total + Number(carga.litros || 0),
+      0
+    );
+  }
+
+  function totalCostoCombustible() {
+    return combustibles.reduce((total, carga) => {
+      if (carga.precio_litro === null || carga.precio_litro === undefined) {
+        return total;
+      }
+
+      return (
+        total +
+        Number(carga.litros || 0) * Number(carga.precio_litro || 0)
+      );
+    }, 0);
+  }
+
+  function formatearNumero(valor: number, decimales = 2) {
+    return Number(valor).toLocaleString("es-BO", {
+      minimumFractionDigits: decimales,
+      maximumFractionDigits: decimales,
+    });
+  }
+
+  function etiquetaCombustible(tipo: string) {
+    const valor = tipo.trim().toLowerCase();
+
+    if (valor === "diesel") return "Diésel";
+    if (valor === "gasolina") return "Gasolina";
+    if (valor === "gnv") return "GNV";
+
+    return tipo;
   }
 
   function etiquetaEstado(estado: Maquinaria["estado"]) {
@@ -697,6 +910,307 @@ export default function FichaMaquinariaPage() {
               </section>
             )}
 
+            {mostrarCombustible && (
+              <section className="panel panel-combustible">
+                <div className="titulo-panel">
+                  <div>
+                    <div className="eyebrow">CONTROL DE COMBUSTIBLE</div>
+                    <h2>Combustible</h2>
+                    <p>
+                      Historial de cargas, litros, precios y costos de este
+                      equipo.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="boton-cerrar"
+                    onClick={cerrarCombustible}
+                  >
+                    ×
+                  </button>
+                </div>
+
+                <div className="combustible-resumen">
+                  <div>
+                    <span>Total cargado</span>
+                    <strong>
+                      {formatearNumero(totalLitrosCombustible())} L
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>Costo registrado</span>
+                    <strong>
+                      {formatearDinero(totalCostoCombustible())}
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>Cargas</span>
+                    <strong>{combustibles.length}</strong>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="boton-principal"
+                    onClick={abrirNuevoCombustible}
+                  >
+                    + Registrar carga
+                  </button>
+                </div>
+
+                {mostrarFormularioCombustible && (
+                  <form
+                    className="form-combustible"
+                    onSubmit={registrarCombustible}
+                  >
+                    <div className="form-combustible-grid">
+                      <label>
+                        <span>Fecha *</span>
+                        <input
+                          type="date"
+                          value={fechaCombustible}
+                          onChange={(e) =>
+                            setFechaCombustible(e.target.value)
+                          }
+                          required
+                        />
+                      </label>
+
+                      <label>
+                        <span>Tipo de combustible *</span>
+                        <input
+                          type="text"
+                          value={tipoCombustible}
+                          onChange={(e) =>
+                            setTipoCombustible(e.target.value)
+                          }
+                          placeholder="Ej. diesel"
+                          required
+                        />
+                      </label>
+
+                      <label>
+                        <span>Litros *</span>
+                        <div className="input-unidad">
+                          <input
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                            inputMode="decimal"
+                            value={litrosCombustible}
+                            onChange={(e) =>
+                              setLitrosCombustible(e.target.value)
+                            }
+                            placeholder="0"
+                            required
+                          />
+                          <span>L</span>
+                        </div>
+                      </label>
+
+                      <label>
+                        <span>Precio por litro</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          inputMode="decimal"
+                          value={precioLitroCombustible}
+                          onChange={(e) =>
+                            setPrecioLitroCombustible(e.target.value)
+                          }
+                          placeholder="0.00"
+                        />
+                      </label>
+
+                      {maquina.tipo_medicion !== "ninguno" && (
+                        <label>
+                          <span>
+                            {maquina.tipo_medicion === "horas"
+                              ? "Horómetro al cargar"
+                              : "Kilometraje al cargar"}
+                          </span>
+
+                          <div className="input-unidad">
+                            <input
+                              type="number"
+                              min={Number(maquina.lectura_actual || 0)}
+                              step="0.01"
+                              inputMode="decimal"
+                              value={lecturaCombustible}
+                              onChange={(e) =>
+                                setLecturaCombustible(e.target.value)
+                              }
+                              placeholder={String(
+                                maquina.lectura_actual || 0
+                              )}
+                            />
+                            <span>{unidadLectura()}</span>
+                          </div>
+                        </label>
+                      )}
+
+                      <label>
+                        <span>Proveedor</span>
+                        <input
+                          type="text"
+                          value={proveedorCombustible}
+                          onChange={(e) =>
+                            setProveedorCombustible(e.target.value)
+                          }
+                          placeholder="Ej. Estación de servicio"
+                        />
+                      </label>
+
+                      <label className="campo-completo">
+                        <span>Observaciones</span>
+                        <textarea
+                          value={observacionCombustible}
+                          onChange={(e) =>
+                            setObservacionCombustible(e.target.value)
+                          }
+                          placeholder="Ej. Carga completa antes de iniciar trabajos."
+                          rows={3}
+                        />
+                      </label>
+                    </div>
+
+                    <div className="acciones-form">
+                      <button
+                        type="button"
+                        className="boton-secundario"
+                        onClick={() =>
+                          setMostrarFormularioCombustible(false)
+                        }
+                        disabled={guardandoCombustible}
+                      >
+                        Cancelar
+                      </button>
+
+                      <button
+                        type="submit"
+                        className="boton-principal"
+                        disabled={guardandoCombustible}
+                      >
+                        {guardandoCombustible
+                          ? "Guardando..."
+                          : "Guardar carga"}
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                <div className="historial-cabecera">
+                  <h3>Historial de combustible</h3>
+                  <span>
+                    {combustibles.length}{" "}
+                    {combustibles.length === 1
+                      ? "registro"
+                      : "registros"}
+                  </span>
+                </div>
+
+                {combustibles.length === 0 ? (
+                  <div className="sin-lecturas">
+                    <div>⛽</div>
+                    <strong>
+                      No hay cargas de combustible registradas todavía
+                    </strong>
+                    <p>
+                      Registra la primera carga para comenzar el historial.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="tabla-contenedor">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Fecha</th>
+                          <th>Combustible</th>
+                          <th>Litros</th>
+                          <th>Precio/L</th>
+                          <th>Costo</th>
+                          <th>Lectura</th>
+                          <th>Proveedor</th>
+                          <th>Observación</th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        {combustibles.map((carga) => {
+                          const costo =
+                            carga.precio_litro === null ||
+                            carga.precio_litro === undefined
+                              ? null
+                              : Number(carga.litros) *
+                                Number(carga.precio_litro);
+
+                          return (
+                            <tr key={carga.id}>
+                              <td data-label="Fecha">
+                                {formatearFecha(carga.fecha)}
+                              </td>
+
+                              <td data-label="Combustible">
+                                {etiquetaCombustible(
+                                  carga.tipo_combustible
+                                )}
+                              </td>
+
+                              <td data-label="Litros">
+                                <strong>
+                                  {formatearNumero(
+                                    Number(carga.litros)
+                                  )}{" "}
+                                  L
+                                </strong>
+                              </td>
+
+                              <td data-label="Precio/L">
+                                {carga.precio_litro === null ||
+                                carga.precio_litro === undefined
+                                  ? "—"
+                                  : formatearDinero(
+                                      Number(carga.precio_litro)
+                                    )}
+                              </td>
+
+                              <td data-label="Costo">
+                                {costo === null
+                                  ? "—"
+                                  : formatearDinero(costo)}
+                              </td>
+
+                              <td data-label="Lectura">
+                                {carga.lectura_maquina === null ||
+                                carga.lectura_maquina === undefined
+                                  ? "—"
+                                  : `${Number(
+                                      carga.lectura_maquina
+                                    ).toLocaleString("es-BO")} ${
+                                      unidadLectura()
+                                    }`}
+                              </td>
+
+                              <td data-label="Proveedor">
+                                {carga.proveedor || "—"}
+                              </td>
+
+                              <td data-label="Observación">
+                                {carga.observaciones || "—"}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </section>
+            )}
+
             <section className="panel">
               <div className="titulo-panel">
                 <div>
@@ -741,11 +1255,30 @@ export default function FichaMaquinariaPage() {
                   )}
                 </button>
 
-                <Modulo
-                  icono="⛽"
-                  titulo="Combustible"
-                  descripcion="Cargas, litros, precios y consumo."
-                />
+                <button
+                  type="button"
+                  className="modulo modulo-activo"
+                  onClick={abrirCombustible}
+                >
+                  <div className="modulo-icono">⛽</div>
+
+                  <div className="modulo-texto">
+                    <strong>Combustible</strong>
+                    <p>
+                      {combustibles.length === 0
+                        ? "Cargas, litros, precios y consumo."
+                        : `${formatearNumero(
+                            totalLitrosCombustible()
+                          )} L · ${combustibles.length} ${
+                            combustibles.length === 1
+                              ? "registro"
+                              : "registros"
+                          }`}
+                    </p>
+                  </div>
+
+                  <span className="disponible">Abrir →</span>
+                </button>
 
                 <Modulo
                   icono="🔧"
@@ -1053,6 +1586,10 @@ const estilos = `
     border-top: 4px solid #2d7545;
   }
 
+  .panel-combustible {
+    border-top: 4px solid #2d7545;
+  }
+
   .titulo-panel {
     display: flex;
     align-items: flex-start;
@@ -1250,6 +1787,90 @@ const estilos = `
     color: #173d27;
     font-size: 25px;
     margin-top: 4px;
+  }
+
+  .combustible-resumen {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+    align-items: center;
+    gap: 12px;
+    background: #f4f8f5;
+    border: 1px solid #e0e9e2;
+    border-radius: 13px;
+    padding: 17px;
+    margin-bottom: 17px;
+  }
+
+  .combustible-resumen > div {
+    min-width: 0;
+  }
+
+  .combustible-resumen span {
+    display: block;
+    color: #738078;
+    font-size: 11px;
+  }
+
+  .combustible-resumen strong {
+    display: block;
+    color: #173d27;
+    font-size: 20px;
+    margin-top: 4px;
+    overflow-wrap: anywhere;
+  }
+
+  .form-combustible {
+    border: 1px solid #dce6de;
+    background: #fbfcfb;
+    border-radius: 13px;
+    padding: 17px;
+    margin-bottom: 20px;
+  }
+
+  .form-combustible-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .form-combustible label {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .form-combustible label > span {
+    color: #405046;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .form-combustible input,
+  .form-combustible textarea {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #ccd6ce;
+    border-radius: 9px;
+    background: white;
+    color: #1e2e23;
+    padding: 10px 11px;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+  }
+
+  .form-combustible input {
+    min-height: 42px;
+  }
+
+  .form-combustible textarea {
+    resize: vertical;
+  }
+
+  .form-combustible input:focus,
+  .form-combustible textarea:focus {
+    border-color: #3c8656;
+    box-shadow: 0 0 0 3px rgba(60, 134, 86, 0.09);
   }
 
   .form-lectura {
@@ -1557,11 +2178,29 @@ const estilos = `
     .lectura-actual-box strong {
       font-size: 21px;
     }
+
+    .combustible-resumen {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .combustible-resumen .boton-principal {
+      grid-column: 1 / -1;
+      width: 100%;
+    }
   }
 
   @media (max-width: 600px) {
-    .form-lectura-grid {
+    .form-lectura-grid,
+    .form-combustible-grid {
       grid-template-columns: 1fr;
+    }
+
+    .combustible-resumen {
+      grid-template-columns: 1fr;
+    }
+
+    .combustible-resumen .boton-principal {
+      grid-column: auto;
     }
 
     .campo-completo {
