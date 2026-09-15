@@ -77,6 +77,8 @@ export default function GastosPage() {
   const [mensaje, setMensaje] = useState("");
   const [error, setError] = useState("");
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
+  const [gastoEditandoId, setGastoEditandoId] = useState<string | null>(null);
+  const [eliminandoId, setEliminandoId] = useState<string | null>(null);
   const [esMovil, setEsMovil] = useState(false);
 
   const [fecha, setFecha] = useState(hoyLocal());
@@ -158,6 +160,25 @@ export default function GastosPage() {
     setMetodoPago("");
     setNumeroDocumento("");
     setObservaciones("");
+    setGastoEditandoId(null);
+  };
+
+  const cargarGastoParaEditar = (gasto: Gasto) => {
+    setFecha(gasto.fecha);
+    setDescripcion(gasto.descripcion);
+    setCategoria(gasto.categoria);
+    setMonto(String(gasto.monto));
+    setMoneda(gasto.moneda);
+    setCentroCostoId(gasto.centro_costo_id || "");
+    setProveedorId(gasto.proveedor_id || "");
+    setMetodoPago(gasto.metodo_pago || "");
+    setNumeroDocumento(gasto.numero_documento || "");
+    setObservaciones(gasto.observaciones || "");
+    setGastoEditandoId(gasto.id);
+    setMostrarFormulario(true);
+    setMensaje("");
+    setError("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const registrarGasto = async (e: FormEvent) => {
@@ -179,8 +200,7 @@ export default function GastosPage() {
 
     setGuardando(true);
 
-    const { error: rpcError } = await supabase.rpc("gan_registrar_gasto", {
-      p_finca_id: FINCA_ID,
+    const parametrosComunes = {
       p_fecha: fecha,
       p_descripcion: descripcion.trim(),
       p_categoria: categoria,
@@ -191,7 +211,17 @@ export default function GastosPage() {
       p_metodo_pago: metodoPago.trim() || null,
       p_numero_documento: numeroDocumento.trim() || null,
       p_observaciones: observaciones.trim() || null,
-    });
+    };
+
+    const { error: rpcError } = gastoEditandoId
+      ? await supabase.rpc("gan_editar_gasto", {
+          p_gasto_id: gastoEditandoId,
+          ...parametrosComunes,
+        })
+      : await supabase.rpc("gan_registrar_gasto", {
+          p_finca_id: FINCA_ID,
+          ...parametrosComunes,
+        });
 
     if (rpcError) {
       setError(rpcError.message);
@@ -201,9 +231,42 @@ export default function GastosPage() {
 
     limpiarFormulario();
     setMostrarFormulario(false);
-    setMensaje("Gasto registrado correctamente.");
+    setMensaje(gastoEditandoId ? "Gasto actualizado correctamente." : "Gasto registrado correctamente.");
     await cargarDatos();
     setGuardando(false);
+  };
+
+  const eliminarGasto = async (gasto: Gasto) => {
+    const confirmar = window.confirm(
+      `¿Eliminar el gasto "${gasto.descripcion}" por ${
+        gasto.moneda === "BOB" ? "Bs" : "USD"
+      } ${formatoNumero(Number(gasto.monto))}?\n\nEsta acción no se puede deshacer.`
+    );
+
+    if (!confirmar) return;
+
+    setEliminandoId(gasto.id);
+    setMensaje("");
+    setError("");
+
+    const { error: rpcError } = await supabase.rpc("gan_eliminar_gasto", {
+      p_gasto_id: gasto.id,
+    });
+
+    if (rpcError) {
+      setError(rpcError.message);
+      setEliminandoId(null);
+      return;
+    }
+
+    if (gastoEditandoId === gasto.id) {
+      limpiarFormulario();
+      setMostrarFormulario(false);
+    }
+
+    setMensaje("Gasto eliminado correctamente.");
+    await cargarDatos();
+    setEliminandoId(null);
   };
 
   const gastosFiltrados = useMemo(() => {
@@ -274,7 +337,13 @@ export default function GastosPage() {
             onClick={() => {
               setMensaje("");
               setError("");
-              setMostrarFormulario((valor) => !valor);
+              if (mostrarFormulario) {
+                limpiarFormulario();
+                setMostrarFormulario(false);
+              } else {
+                limpiarFormulario();
+                setMostrarFormulario(true);
+              }
             }}
           >
             {mostrarFormulario ? "Cerrar" : "+ Registrar gasto"}
@@ -286,7 +355,7 @@ export default function GastosPage() {
 
         {mostrarFormulario && (
           <section style={estilos.panel}>
-            <div style={estilos.panelTitulo}>Nuevo gasto</div>
+            <div style={estilos.panelTitulo}>{gastoEditandoId ? "Editar gasto" : "Nuevo gasto"}</div>
 
             <form onSubmit={registrarGasto}>
               <div style={estilos.formGrid}>
@@ -432,7 +501,7 @@ export default function GastosPage() {
                     opacity: guardando ? 0.65 : 1,
                   }}
                 >
-                  {guardando ? "Guardando..." : "Guardar gasto"}
+                  {guardando ? "Guardando..." : gastoEditandoId ? "Guardar cambios" : "Guardar gasto"}
                 </button>
               </div>
             </form>
@@ -549,6 +618,24 @@ export default function GastosPage() {
                     )}
                   </div>
 
+                  <div style={estilos.accionesFilaMovil}>
+                    <button
+                      type="button"
+                      style={estilos.botonEditar}
+                      onClick={() => cargarGastoParaEditar(gasto)}
+                    >
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      disabled={eliminandoId === gasto.id}
+                      style={estilos.botonEliminar}
+                      onClick={() => eliminarGasto(gasto)}
+                    >
+                      {eliminandoId === gasto.id ? "Eliminando..." : "Eliminar"}
+                    </button>
+                  </div>
+
                   <div style={estilos.detalleMovil}>
                     <span>Proveedor: {nombreProveedor(gasto.proveedor_id)}</span>
                     <span>Pago: {gasto.metodo_pago || "—"}</span>
@@ -569,6 +656,7 @@ export default function GastosPage() {
                     <th style={estilos.th}>Proveedor</th>
                     <th style={estilos.th}>Pago</th>
                     <th style={{ ...estilos.th, textAlign: "right" }}>Monto</th>
+                    <th style={{ ...estilos.th, textAlign: "right" }}>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -605,6 +693,23 @@ export default function GastosPage() {
                       >
                         {gasto.moneda === "BOB" ? "Bs" : "USD"}{" "}
                         {formatoNumero(Number(gasto.monto))}
+                      </td>
+                      <td style={{ ...estilos.td, textAlign: "right", whiteSpace: "nowrap" }}>
+                        <button
+                          type="button"
+                          style={estilos.botonEditar}
+                          onClick={() => cargarGastoParaEditar(gasto)}
+                        >
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          disabled={eliminandoId === gasto.id}
+                          style={{ ...estilos.botonEliminar, marginLeft: "6px" }}
+                          onClick={() => eliminarGasto(gasto)}
+                        >
+                          {eliminandoId === gasto.id ? "..." : "Eliminar"}
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -930,6 +1035,33 @@ const estilos: Record<string, React.CSSProperties> = {
     fontSize: "10px",
     fontWeight: 750,
   },
+  accionesFilaMovil: {
+    display: "flex",
+    gap: "7px",
+    marginTop: "11px",
+  },
+  botonEditar: {
+    border: "1px solid #cbdcd2",
+    borderRadius: "7px",
+    background: "#f4faf6",
+    color: "#176b3a",
+    padding: "6px 9px",
+    fontSize: "10px",
+    fontWeight: 800,
+    cursor: "pointer",
+    fontFamily: "inherit",
+  },
+  botonEliminar: {
+    border: "1px solid #efcccc",
+    borderRadius: "7px",
+    background: "#fff5f5",
+    color: "#a83232",
+    padding: "6px 9px",
+    fontSize: "10px",
+    fontWeight: 800,
+    cursor: "pointer",
+    fontFamily: "inherit",
+  },
   detalleMovil: {
     marginTop: "11px",
     paddingTop: "10px",
@@ -941,4 +1073,3 @@ const estilos: Record<string, React.CSSProperties> = {
     fontSize: "10px",
   },
 };
-
