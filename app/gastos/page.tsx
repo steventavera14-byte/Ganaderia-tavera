@@ -16,7 +16,13 @@ type CentroCosto = {
 type Proveedor = {
   id: string;
   nombre: string;
+  nit: string | null;
+  telefono: string | null;
+  email: string | null;
+  direccion: string | null;
+  rubro: string | null;
   activo: boolean;
+  observaciones: string | null;
 };
 
 type Gasto = {
@@ -81,6 +87,19 @@ export default function GastosPage() {
   const [eliminandoId, setEliminandoId] = useState<string | null>(null);
   const [esMovil, setEsMovil] = useState(false);
 
+  const [mostrarProveedores, setMostrarProveedores] = useState(false);
+  const [mostrarFormProveedor, setMostrarFormProveedor] = useState(false);
+  const [proveedorEditandoId, setProveedorEditandoId] = useState<string | null>(null);
+  const [guardandoProveedor, setGuardandoProveedor] = useState(false);
+  const [cambiandoProveedorId, setCambiandoProveedorId] = useState<string | null>(null);
+  const [provNombre, setProvNombre] = useState("");
+  const [provNit, setProvNit] = useState("");
+  const [provTelefono, setProvTelefono] = useState("");
+  const [provEmail, setProvEmail] = useState("");
+  const [provDireccion, setProvDireccion] = useState("");
+  const [provRubro, setProvRubro] = useState("");
+  const [provObservaciones, setProvObservaciones] = useState("");
+
   const [fecha, setFecha] = useState(hoyLocal());
   const [descripcion, setDescripcion] = useState("");
   const [categoria, setCategoria] = useState("ganado");
@@ -123,9 +142,8 @@ export default function GastosPage() {
         .order("nombre"),
       supabase
         .from("gan_proveedores")
-        .select("id,nombre,activo")
+        .select("id,nombre,nit,telefono,email,direccion,rubro,activo,observaciones")
         .eq("finca_id", FINCA_ID)
-        .eq("activo", true)
         .order("nombre"),
     ]);
 
@@ -267,6 +285,124 @@ export default function GastosPage() {
     setMensaje("Gasto eliminado correctamente.");
     await cargarDatos();
     setEliminandoId(null);
+  };
+
+  const limpiarProveedor = () => {
+    setProveedorEditandoId(null);
+    setProvNombre("");
+    setProvNit("");
+    setProvTelefono("");
+    setProvEmail("");
+    setProvDireccion("");
+    setProvRubro("");
+    setProvObservaciones("");
+  };
+
+  const editarProveedor = (proveedor: Proveedor) => {
+    setProveedorEditandoId(proveedor.id);
+    setProvNombre(proveedor.nombre);
+    setProvNit(proveedor.nit || "");
+    setProvTelefono(proveedor.telefono || "");
+    setProvEmail(proveedor.email || "");
+    setProvDireccion(proveedor.direccion || "");
+    setProvRubro(proveedor.rubro || "");
+    setProvObservaciones(proveedor.observaciones || "");
+    setMostrarFormProveedor(true);
+    setMensaje("");
+    setError("");
+  };
+
+  const guardarProveedor = async (e: FormEvent) => {
+    e.preventDefault();
+    setMensaje("");
+    setError("");
+
+    if (!provNombre.trim()) {
+      setError("El nombre del proveedor es obligatorio.");
+      return;
+    }
+
+    setGuardandoProveedor(true);
+
+    const datos = {
+      p_nombre: provNombre.trim(),
+      p_nit: provNit.trim() || null,
+      p_telefono: provTelefono.trim() || null,
+      p_email: provEmail.trim() || null,
+      p_direccion: provDireccion.trim() || null,
+      p_rubro: provRubro.trim() || null,
+      p_observaciones: provObservaciones.trim() || null,
+    };
+
+    const { error: rpcError } = proveedorEditandoId
+      ? await supabase.rpc("gan_editar_proveedor", {
+          p_proveedor_id: proveedorEditandoId,
+          ...datos,
+        })
+      : await supabase.rpc("gan_crear_proveedor", {
+          p_finca_id: FINCA_ID,
+          ...datos,
+        });
+
+    if (rpcError) {
+      setError(rpcError.message);
+      setGuardandoProveedor(false);
+      return;
+    }
+
+    const eraEdicion = Boolean(proveedorEditandoId);
+    limpiarProveedor();
+    setMostrarFormProveedor(false);
+    setMensaje(
+      eraEdicion
+        ? "Proveedor actualizado correctamente."
+        : "Proveedor creado correctamente."
+    );
+    await cargarDatos();
+    setGuardandoProveedor(false);
+  };
+
+  const cambiarEstadoProveedor = async (proveedor: Proveedor) => {
+    const nuevoEstado = !proveedor.activo;
+    const accion = nuevoEstado ? "activar" : "desactivar";
+
+    if (
+      !window.confirm(
+        `¿Seguro que deseas ${accion} al proveedor "${proveedor.nombre}"?`
+      )
+    ) {
+      return;
+    }
+
+    setCambiandoProveedorId(proveedor.id);
+    setMensaje("");
+    setError("");
+
+    const { error: rpcError } = await supabase.rpc(
+      "gan_cambiar_estado_proveedor",
+      {
+        p_proveedor_id: proveedor.id,
+        p_activo: nuevoEstado,
+      }
+    );
+
+    if (rpcError) {
+      setError(rpcError.message);
+      setCambiandoProveedorId(null);
+      return;
+    }
+
+    if (!nuevoEstado && proveedorId === proveedor.id) {
+      setProveedorId("");
+    }
+
+    setMensaje(
+      nuevoEstado
+        ? "Proveedor activado correctamente."
+        : "Proveedor desactivado correctamente."
+    );
+    await cargarDatos();
+    setCambiandoProveedorId(null);
   };
 
   const gastosFiltrados = useMemo(() => {
@@ -439,11 +575,13 @@ export default function GastosPage() {
                     style={estilos.input}
                   >
                     <option value="">Sin proveedor</option>
-                    {proveedores.map((proveedor) => (
-                      <option key={proveedor.id} value={proveedor.id}>
-                        {proveedor.nombre}
-                      </option>
-                    ))}
+                    {proveedores
+                      .filter((proveedor) => proveedor.activo)
+                      .map((proveedor) => (
+                        <option key={proveedor.id} value={proveedor.id}>
+                          {proveedor.nombre}
+                        </option>
+                      ))}
                   </select>
                 </Campo>
 
@@ -524,6 +662,203 @@ export default function GastosPage() {
             valor={String(gastosFiltrados.length)}
             detalle="Gastos encontrados"
           />
+        </section>
+
+        <section style={estilos.panel}>
+          <div style={estilos.panelCabecera}>
+            <div>
+              <div style={estilos.panelTitulo}>Proveedores</div>
+              <div style={estilos.panelSubtitulo}>
+                Administra los proveedores utilizados en tus gastos y facturas.
+              </div>
+            </div>
+
+            <div style={estilos.botonesProveedor}>
+              <button
+                type="button"
+                style={estilos.botonSecundario}
+                onClick={() => setMostrarProveedores((valor) => !valor)}
+              >
+                {mostrarProveedores ? "Ocultar proveedores" : "Ver proveedores"}
+              </button>
+
+              <button
+                type="button"
+                style={estilos.botonPrincipal}
+                onClick={() => {
+                  limpiarProveedor();
+                  setMostrarProveedores(true);
+                  setMostrarFormProveedor(true);
+                  setMensaje("");
+                  setError("");
+                }}
+              >
+                + Nuevo proveedor
+              </button>
+            </div>
+          </div>
+
+          {mostrarFormProveedor && (
+            <form onSubmit={guardarProveedor} style={estilos.formProveedor}>
+              <div style={estilos.formGrid}>
+                <Campo label="Nombre *">
+                  <input
+                    value={provNombre}
+                    onChange={(e) => setProvNombre(e.target.value)}
+                    placeholder="Ej. Veterinaria Central"
+                    style={estilos.input}
+                    required
+                  />
+                </Campo>
+
+                <Campo label="NIT">
+                  <input
+                    value={provNit}
+                    onChange={(e) => setProvNit(e.target.value)}
+                    placeholder="Opcional"
+                    style={estilos.input}
+                  />
+                </Campo>
+
+                <Campo label="Teléfono">
+                  <input
+                    value={provTelefono}
+                    onChange={(e) => setProvTelefono(e.target.value)}
+                    placeholder="Opcional"
+                    style={estilos.input}
+                  />
+                </Campo>
+
+                <Campo label="Email">
+                  <input
+                    type="email"
+                    value={provEmail}
+                    onChange={(e) => setProvEmail(e.target.value)}
+                    placeholder="Opcional"
+                    style={estilos.input}
+                  />
+                </Campo>
+
+                <Campo label="Rubro">
+                  <input
+                    value={provRubro}
+                    onChange={(e) => setProvRubro(e.target.value)}
+                    placeholder="Ej. Veterinaria, combustible, taller"
+                    style={estilos.input}
+                  />
+                </Campo>
+
+                <Campo label="Dirección">
+                  <input
+                    value={provDireccion}
+                    onChange={(e) => setProvDireccion(e.target.value)}
+                    placeholder="Opcional"
+                    style={estilos.input}
+                  />
+                </Campo>
+
+                <Campo label="Observaciones">
+                  <input
+                    value={provObservaciones}
+                    onChange={(e) => setProvObservaciones(e.target.value)}
+                    placeholder="Opcional"
+                    style={estilos.input}
+                  />
+                </Campo>
+              </div>
+
+              <div style={estilos.accionesFormulario}>
+                <button
+                  type="button"
+                  style={estilos.botonSecundario}
+                  onClick={() => {
+                    limpiarProveedor();
+                    setMostrarFormProveedor(false);
+                  }}
+                >
+                  Cancelar
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={guardandoProveedor}
+                  style={{
+                    ...estilos.botonPrincipal,
+                    opacity: guardandoProveedor ? 0.65 : 1,
+                  }}
+                >
+                  {guardandoProveedor
+                    ? "Guardando..."
+                    : proveedorEditandoId
+                    ? "Guardar cambios"
+                    : "Guardar proveedor"}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {mostrarProveedores && (
+            <div style={estilos.proveedoresLista}>
+              {proveedores.length === 0 ? (
+                <div style={estilos.estadoVacio}>
+                  Todavía no hay proveedores registrados.
+                </div>
+              ) : (
+                proveedores.map((proveedor) => (
+                  <div key={proveedor.id} style={estilos.proveedorCard}>
+                    <div style={estilos.proveedorInfo}>
+                      <div style={estilos.proveedorNombre}>
+                        {proveedor.nombre}
+                        <span
+                          style={
+                            proveedor.activo
+                              ? estilos.estadoActivo
+                              : estilos.estadoInactivo
+                          }
+                        >
+                          {proveedor.activo ? "Activo" : "Inactivo"}
+                        </span>
+                      </div>
+
+                      <div style={estilos.proveedorMeta}>
+                        {proveedor.rubro && <span>{proveedor.rubro}</span>}
+                        {proveedor.nit && <span>NIT: {proveedor.nit}</span>}
+                        {proveedor.telefono && <span>Tel: {proveedor.telefono}</span>}
+                        {proveedor.email && <span>{proveedor.email}</span>}
+                      </div>
+                    </div>
+
+                    <div style={estilos.accionesProveedor}>
+                      <button
+                        type="button"
+                        style={estilos.botonEditar}
+                        onClick={() => editarProveedor(proveedor)}
+                      >
+                        Editar
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={cambiandoProveedorId === proveedor.id}
+                        style={
+                          proveedor.activo
+                            ? estilos.botonEliminar
+                            : estilos.botonActivar
+                        }
+                        onClick={() => cambiarEstadoProveedor(proveedor)}
+                      >
+                        {cambiandoProveedorId === proveedor.id
+                          ? "..."
+                          : proveedor.activo
+                          ? "Desactivar"
+                          : "Activar"}
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
         </section>
 
         <section style={estilos.panel}>
@@ -1056,6 +1391,86 @@ const estilos: Record<string, React.CSSProperties> = {
     borderRadius: "7px",
     background: "#fff5f5",
     color: "#a83232",
+    padding: "6px 9px",
+    fontSize: "10px",
+    fontWeight: 800,
+    cursor: "pointer",
+    fontFamily: "inherit",
+  },
+  botonesProveedor: {
+    display: "flex",
+    gap: "8px",
+    flexWrap: "wrap",
+  },
+  formProveedor: {
+    marginTop: "14px",
+    paddingTop: "4px",
+    borderTop: "1px solid #edf1ef",
+  },
+  proveedoresLista: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "9px",
+    marginTop: "14px",
+  },
+  proveedorCard: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: "14px",
+    flexWrap: "wrap",
+    border: "1px solid #e4ebe7",
+    borderRadius: "11px",
+    padding: "13px 14px",
+    background: "#fafcfb",
+  },
+  proveedorInfo: {
+    minWidth: 0,
+    flex: "1 1 260px",
+  },
+  proveedorNombre: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    flexWrap: "wrap",
+    color: "#173c28",
+    fontSize: "13px",
+    fontWeight: 850,
+  },
+  proveedorMeta: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "5px 12px",
+    marginTop: "5px",
+    color: "#7b8c82",
+    fontSize: "10px",
+  },
+  estadoActivo: {
+    background: "#e8f6ed",
+    color: "#176b3a",
+    borderRadius: "999px",
+    padding: "3px 7px",
+    fontSize: "9px",
+    fontWeight: 800,
+  },
+  estadoInactivo: {
+    background: "#f1f2f1",
+    color: "#7d8882",
+    borderRadius: "999px",
+    padding: "3px 7px",
+    fontSize: "9px",
+    fontWeight: 800,
+  },
+  accionesProveedor: {
+    display: "flex",
+    gap: "7px",
+    flexWrap: "wrap",
+  },
+  botonActivar: {
+    border: "1px solid #bcdcc8",
+    borderRadius: "7px",
+    background: "#eef9f2",
+    color: "#176b3a",
     padding: "6px 9px",
     fontSize: "10px",
     fontWeight: 800,
