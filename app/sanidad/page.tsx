@@ -39,15 +39,14 @@ const nombresTipos: Record<string, string> = {
 export default function SanidadPage() {
   const [loading, setLoading] = useState(true);
   const [guardando, setGuardando] = useState(false);
-  const [mostrarFormulario, setMostrarFormulario] =
-    useState(false);
+  const [mostrarFormulario, setMostrarFormulario] = useState(false);
+  const [esMovil, setEsMovil] = useState(false);
 
   const [mensaje, setMensaje] = useState("");
   const [fincaId, setFincaId] = useState("");
 
   const [lotes, setLotes] = useState<Lote[]>([]);
-  const [eventos, setEventos] =
-    useState<EventoSanitario[]>([]);
+  const [eventos, setEventos] = useState<EventoSanitario[]>([]);
 
   const [form, setForm] = useState({
     fecha: new Date().toISOString().split("T")[0],
@@ -64,6 +63,20 @@ export default function SanidadPage() {
     iniciar();
   }, []);
 
+  useEffect(() => {
+    const actualizar = () => {
+      setEsMovil(window.innerWidth <= 820);
+    };
+
+    actualizar();
+
+    window.addEventListener("resize", actualizar);
+
+    return () => {
+      window.removeEventListener("resize", actualizar);
+    };
+  }, []);
+
   const iniciar = async () => {
     setLoading(true);
 
@@ -76,13 +89,12 @@ export default function SanidadPage() {
       return;
     }
 
-    const { data: usuario, error: errorUsuario } =
-      await supabase
-        .from("gan_usuarios")
-        .select("finca_id")
-        .eq("user_id", user.id)
-        .eq("activo", true)
-        .maybeSingle();
+    const { data: usuario, error: errorUsuario } = await supabase
+      .from("gan_usuarios")
+      .select("finca_id")
+      .eq("user_id", user.id)
+      .eq("activo", true)
+      .maybeSingle();
 
     if (errorUsuario || !usuario) {
       await supabase.auth.signOut();
@@ -109,9 +121,7 @@ export default function SanidadPage() {
       .order("nombre");
 
     if (error) {
-      setMensaje(
-        `Error al cargar lotes: ${error.message}`
-      );
+      setMensaje(`Error al cargar lotes: ${error.message}`);
       return;
     }
 
@@ -140,34 +150,24 @@ export default function SanidadPage() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      setMensaje(
-        `Error al cargar sanidad: ${error.message}`
-      );
+      setMensaje(`Error al cargar sanidad: ${error.message}`);
       return;
     }
 
-    setEventos(
-      (data || []) as unknown as EventoSanitario[]
-    );
+    setEventos((data || []) as unknown as EventoSanitario[]);
   };
 
   const seleccionarLote = (loteId: string) => {
-    const lote = lotes.find(
-      (item) => item.id === loteId
-    );
+    const lote = lotes.find((item) => item.id === loteId);
 
     setForm((anterior) => ({
       ...anterior,
       lote_id: loteId,
-      cantidad_animales: lote
-        ? String(lote.cantidad_total)
-        : "",
+      cantidad_animales: lote ? String(lote.cantidad_total) : "",
     }));
   };
 
-  const guardarEvento = async (
-    e: React.FormEvent
-  ) => {
+  const guardarEvento = async (e: React.FormEvent) => {
     e.preventDefault();
 
     setMensaje("");
@@ -178,20 +178,14 @@ export default function SanidadPage() {
     }
 
     if (!form.tipo_evento) {
-      setMensaje(
-        "Debes seleccionar el tipo de evento sanitario."
-      );
+      setMensaje("Debes seleccionar el tipo de evento sanitario.");
       return;
     }
 
-    const cantidad = Number(
-      form.cantidad_animales
-    );
+    const cantidad = Number(form.cantidad_animales);
 
     if (!cantidad || cantidad <= 0) {
-      setMensaje(
-        "La cantidad de animales debe ser mayor a cero."
-      );
+      setMensaje("La cantidad de animales debe ser mayor a cero.");
       return;
     }
 
@@ -228,21 +222,15 @@ export default function SanidadPage() {
         fecha: form.fecha,
         tipo_evento: form.tipo_evento,
         cantidad_animales: cantidad,
-        diagnostico:
-          form.diagnostico.trim() || null,
-        descripcion:
-          form.descripcion.trim() || null,
-        veterinario:
-          form.veterinario.trim() || null,
-        observaciones:
-          form.observaciones.trim() || null,
+        diagnostico: form.diagnostico.trim() || null,
+        descripcion: form.descripcion.trim() || null,
+        veterinario: form.veterinario.trim() || null,
+        observaciones: form.observaciones.trim() || null,
         registrado_por: user.id,
       });
 
     if (error) {
-      setMensaje(
-        `Error al registrar evento: ${error.message}`
-      );
+      setMensaje(`Error al registrar evento: ${error.message}`);
       setGuardando(false);
       return;
     }
@@ -260,9 +248,7 @@ export default function SanidadPage() {
 
     setMostrarFormulario(false);
 
-    setMensaje(
-      "Evento sanitario registrado correctamente."
-    );
+    setMensaje("Evento sanitario registrado correctamente.");
 
     await cargarEventos(fincaId);
 
@@ -270,15 +256,12 @@ export default function SanidadPage() {
   };
 
   const formatearFecha = (fecha: string) => {
-    return new Date(fecha).toLocaleDateString(
-      "es-BO",
-      {
-        timeZone: "UTC",
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      }
-    );
+    return new Date(fecha).toLocaleDateString("es-BO", {
+      timeZone: "UTC",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
   };
 
   if (loading) {
@@ -293,25 +276,46 @@ export default function SanidadPage() {
     <main style={estilos.pagina}>
       <Sidebar />
 
-      <section style={estilos.contenido}>
-        <header style={estilos.header}>
+      <section
+        style={{
+          ...estilos.contenido,
+          ...(esMovil ? estilos.contenidoMovil : {}),
+        }}
+      >
+        <header
+          style={{
+            ...estilos.header,
+            ...(esMovil ? estilos.headerMovil : {}),
+          }}
+        >
           <div>
-            <h1 style={estilos.titulo}>
+            <h1
+              style={{
+                ...estilos.titulo,
+                ...(esMovil ? estilos.tituloMovil : {}),
+              }}
+            >
               Sanidad
             </h1>
 
-            <p style={estilos.subtitulo}>
+            <p
+              style={{
+                ...estilos.subtitulo,
+                ...(esMovil ? estilos.subtituloMovil : {}),
+              }}
+            >
               Control sanitario del ganado
             </p>
           </div>
 
           <button
-            style={estilos.botonPrincipal}
+            style={{
+              ...estilos.botonPrincipal,
+              ...(esMovil ? estilos.botonPrincipalMovil : {}),
+            }}
             onClick={() => {
               setMensaje("");
-              setMostrarFormulario(
-                !mostrarFormulario
-              );
+              setMostrarFormulario(!mostrarFormulario);
             }}
           >
             {mostrarFormulario
@@ -324,31 +328,36 @@ export default function SanidadPage() {
           <div
             style={{
               ...estilos.mensaje,
-              background:
-                mensaje.includes("correctamente")
-                  ? "#edf8f0"
-                  : "#fff1f1",
-              color:
-                mensaje.includes("correctamente")
-                  ? "#176b3a"
-                  : "#b42318",
+              background: mensaje.includes("correctamente")
+                ? "#edf8f0"
+                : "#fff1f1",
+              color: mensaje.includes("correctamente")
+                ? "#176b3a"
+                : "#b42318",
             }}
           >
             {mensaje}
           </div>
         )}
 
-        <div style={estilos.resumenGrid}>
+        <div
+          style={{
+            ...estilos.resumenGrid,
+            ...(esMovil ? estilos.resumenGridMovil : {}),
+          }}
+        >
           <Tarjeta
             titulo="Eventos sanitarios"
             valor={String(eventos.length)}
             detalle="Registros realizados"
+            esMovil={esMovil}
           />
 
           <Tarjeta
             titulo="Lotes activos"
             valor={String(lotes.length)}
             detalle="Bajo control sanitario"
+            esMovil={esMovil}
           />
 
           <Tarjeta
@@ -359,19 +368,33 @@ export default function SanidadPage() {
                 : "—"
             }
             detalle="Último registro sanitario"
+            esMovil={esMovil}
           />
         </div>
 
         {mostrarFormulario && (
           <form
             onSubmit={guardarEvento}
-            style={estilos.formulario}
+            style={{
+              ...estilos.formulario,
+              ...(esMovil ? estilos.formularioMovil : {}),
+            }}
           >
-            <h2 style={estilos.formTitulo}>
+            <h2
+              style={{
+                ...estilos.formTitulo,
+                ...(esMovil ? estilos.formTituloMovil : {}),
+              }}
+            >
               Registrar evento sanitario
             </h2>
 
-            <div style={estilos.formGrid}>
+            <div
+              style={{
+                ...estilos.formGrid,
+                ...(esMovil ? estilos.formGridMovil : {}),
+              }}
+            >
               <div>
                 <label style={estilos.label}>
                   Fecha *
@@ -386,7 +409,10 @@ export default function SanidadPage() {
                       fecha: e.target.value,
                     })
                   }
-                  style={estilos.input}
+                  style={{
+                    ...estilos.input,
+                    ...(esMovil ? estilos.inputMovil : {}),
+                  }}
                   required
                 />
               </div>
@@ -399,11 +425,12 @@ export default function SanidadPage() {
                 <select
                   value={form.lote_id}
                   onChange={(e) =>
-                    seleccionarLote(
-                      e.target.value
-                    )
+                    seleccionarLote(e.target.value)
                   }
-                  style={estilos.input}
+                  style={{
+                    ...estilos.input,
+                    ...(esMovil ? estilos.inputMovil : {}),
+                  }}
                   required
                 >
                   <option value="">
@@ -432,11 +459,13 @@ export default function SanidadPage() {
                   onChange={(e) =>
                     setForm({
                       ...form,
-                      tipo_evento:
-                        e.target.value,
+                      tipo_evento: e.target.value,
                     })
                   }
-                  style={estilos.input}
+                  style={{
+                    ...estilos.input,
+                    ...(esMovil ? estilos.inputMovil : {}),
+                  }}
                   required
                 >
                   <option value="">
@@ -489,11 +518,13 @@ export default function SanidadPage() {
                   onChange={(e) =>
                     setForm({
                       ...form,
-                      cantidad_animales:
-                        e.target.value,
+                      cantidad_animales: e.target.value,
                     })
                   }
-                  style={estilos.input}
+                  style={{
+                    ...estilos.input,
+                    ...(esMovil ? estilos.inputMovil : {}),
+                  }}
                   required
                 />
               </div>
@@ -509,12 +540,14 @@ export default function SanidadPage() {
                   onChange={(e) =>
                     setForm({
                       ...form,
-                      veterinario:
-                        e.target.value,
+                      veterinario: e.target.value,
                     })
                   }
                   placeholder="Nombre del responsable"
-                  style={estilos.input}
+                  style={{
+                    ...estilos.input,
+                    ...(esMovil ? estilos.inputMovil : {}),
+                  }}
                 />
               </div>
 
@@ -529,12 +562,14 @@ export default function SanidadPage() {
                   onChange={(e) =>
                     setForm({
                       ...form,
-                      diagnostico:
-                        e.target.value,
+                      diagnostico: e.target.value,
                     })
                   }
                   placeholder="Si corresponde"
-                  style={estilos.input}
+                  style={{
+                    ...estilos.input,
+                    ...(esMovil ? estilos.inputMovil : {}),
+                  }}
                 />
               </div>
             </div>
@@ -550,12 +585,14 @@ export default function SanidadPage() {
                 onChange={(e) =>
                   setForm({
                     ...form,
-                    descripcion:
-                      e.target.value,
+                    descripcion: e.target.value,
                   })
                 }
                 placeholder="Ej. Vacuna aplicada, procedimiento realizado..."
-                style={estilos.input}
+                style={{
+                  ...estilos.input,
+                  ...(esMovil ? estilos.inputMovil : {}),
+                }}
               />
             </div>
 
@@ -569,23 +606,31 @@ export default function SanidadPage() {
                 onChange={(e) =>
                   setForm({
                     ...form,
-                    observaciones:
-                      e.target.value,
+                    observaciones: e.target.value,
                   })
                 }
                 placeholder="Información adicional..."
                 style={{
                   ...estilos.input,
-                  minHeight: "90px",
+                  ...(esMovil ? estilos.inputMovil : {}),
+                  minHeight: esMovil ? "115px" : "90px",
                   resize: "vertical",
                 }}
               />
             </div>
 
-            <div style={estilos.formBotones}>
+            <div
+              style={{
+                ...estilos.formBotones,
+                ...(esMovil ? estilos.formBotonesMovil : {}),
+              }}
+            >
               <button
                 type="button"
-                style={estilos.botonSecundario}
+                style={{
+                  ...estilos.botonSecundario,
+                  ...(esMovil ? estilos.botonFormularioMovil : {}),
+                }}
                 onClick={() =>
                   setMostrarFormulario(false)
                 }
@@ -598,6 +643,7 @@ export default function SanidadPage() {
                 disabled={guardando}
                 style={{
                   ...estilos.botonPrincipal,
+                  ...(esMovil ? estilos.botonFormularioMovil : {}),
                   opacity: guardando ? 0.7 : 1,
                 }}
               >
@@ -610,8 +656,18 @@ export default function SanidadPage() {
         )}
 
         <div style={estilos.tablaPanel}>
-          <div style={estilos.tablaHeader}>
-            <h2 style={estilos.tablaTitulo}>
+          <div
+            style={{
+              ...estilos.tablaHeader,
+              ...(esMovil ? estilos.tablaHeaderMovil : {}),
+            }}
+          >
+            <h2
+              style={{
+                ...estilos.tablaTitulo,
+                ...(esMovil ? estilos.tablaTituloMovil : {}),
+              }}
+            >
               Historial sanitario
             </h2>
 
@@ -632,9 +688,86 @@ export default function SanidadPage() {
               </strong>
 
               <span>
-                Registra la primera actividad
-                sanitaria del ganado.
+                Registra la primera actividad sanitaria del ganado.
               </span>
+            </div>
+          ) : esMovil ? (
+            <div style={estilos.listaMovil}>
+              {eventos.map((evento) => (
+                <div
+                  key={evento.id}
+                  style={estilos.eventoCardMovil}
+                >
+                  <div style={estilos.eventoCardHeader}>
+                    <div>
+                      <span style={estilos.etiquetaSuperior}>
+                        EVENTO SANITARIO
+                      </span>
+
+                      <h3 style={estilos.eventoLote}>
+                        {evento.gan_lotes_ganado?.nombre || "—"}
+                      </h3>
+
+                      <span style={estilos.eventoFecha}>
+                        {formatearFecha(evento.fecha)}
+                      </span>
+                    </div>
+
+                    <span style={estilos.tipoMovil}>
+                      {nombresTipos[evento.tipo_evento] ||
+                        evento.tipo_evento}
+                    </span>
+                  </div>
+
+                  <div style={estilos.separador} />
+
+                  <div style={estilos.cantidadMovil}>
+                    <span style={estilos.datoLabel}>
+                      Animales
+                    </span>
+
+                    <strong style={estilos.cantidadValor}>
+                      {evento.cantidad_animales ?? "—"}
+                    </strong>
+
+                    <span style={estilos.cantidadDetalle}>
+                      animales registrados
+                    </span>
+                  </div>
+
+                  <div style={estilos.detallesGridMovil}>
+                    <DatoMovil
+                      titulo="Veterinario / responsable"
+                      valor={evento.veterinario || "—"}
+                    />
+
+                    <DatoMovil
+                      titulo="Diagnóstico"
+                      valor={evento.diagnostico || "—"}
+                    />
+                  </div>
+
+                  <div style={estilos.detalleCompletoMovil}>
+                    <span style={estilos.datoLabel}>
+                      Descripción
+                    </span>
+
+                    <strong style={estilos.datoValor}>
+                      {evento.descripcion || "—"}
+                    </strong>
+                  </div>
+
+                  <div style={estilos.detalleCompletoMovil}>
+                    <span style={estilos.datoLabel}>
+                      Observaciones
+                    </span>
+
+                    <strong style={estilos.datoValor}>
+                      {evento.observaciones || "—"}
+                    </strong>
+                  </div>
+                </div>
+              ))}
             </div>
           ) : (
             <div style={{ overflowX: "auto" }}>
@@ -679,52 +812,40 @@ export default function SanidadPage() {
                   {eventos.map((evento) => (
                     <tr key={evento.id}>
                       <td style={estilos.td}>
-                        {formatearFecha(
-                          evento.fecha
-                        )}
+                        {formatearFecha(evento.fecha)}
                       </td>
 
                       <td style={estilos.td}>
                         <strong>
-                          {evento.gan_lotes_ganado
-                            ?.nombre || "—"}
+                          {evento.gan_lotes_ganado?.nombre || "—"}
                         </strong>
                       </td>
 
                       <td style={estilos.td}>
-                        <span
-                          style={estilos.tipo}
-                        >
-                          {nombresTipos[
-                            evento.tipo_evento
-                          ] ||
+                        <span style={estilos.tipo}>
+                          {nombresTipos[evento.tipo_evento] ||
                             evento.tipo_evento}
                         </span>
                       </td>
 
                       <td style={estilos.td}>
-                        {evento.cantidad_animales ??
-                          "—"}
+                        {evento.cantidad_animales ?? "—"}
                       </td>
 
                       <td style={estilos.td}>
-                        {evento.diagnostico ||
-                          "—"}
+                        {evento.diagnostico || "—"}
                       </td>
 
                       <td style={estilos.td}>
-                        {evento.descripcion ||
-                          "—"}
+                        {evento.descripcion || "—"}
                       </td>
 
                       <td style={estilos.td}>
-                        {evento.veterinario ||
-                          "—"}
+                        {evento.veterinario || "—"}
                       </td>
 
                       <td style={estilos.td}>
-                        {evento.observaciones ||
-                          "—"}
+                        {evento.observaciones || "—"}
                       </td>
                     </tr>
                   ))}
@@ -742,32 +863,71 @@ function Tarjeta({
   titulo,
   valor,
   detalle,
+  esMovil,
 }: {
   titulo: string;
   valor: string;
   detalle: string;
+  esMovil: boolean;
 }) {
   return (
-    <div style={estilos.tarjeta}>
-      <span style={estilos.tarjetaTitulo}>
+    <div
+      style={{
+        ...estilos.tarjeta,
+        ...(esMovil ? estilos.tarjetaMovil : {}),
+      }}
+    >
+      <span
+        style={{
+          ...estilos.tarjetaTitulo,
+          ...(esMovil ? estilos.tarjetaTituloMovil : {}),
+        }}
+      >
         {titulo}
       </span>
 
-      <strong style={estilos.tarjetaValor}>
+      <strong
+        style={{
+          ...estilos.tarjetaValor,
+          ...(esMovil ? estilos.tarjetaValorMovil : {}),
+        }}
+      >
         {valor}
       </strong>
 
-      <span style={estilos.tarjetaDetalle}>
+      <span
+        style={{
+          ...estilos.tarjetaDetalle,
+          ...(esMovil ? estilos.tarjetaDetalleMovil : {}),
+        }}
+      >
         {detalle}
       </span>
     </div>
   );
 }
 
-const estilos: Record<
-  string,
-  React.CSSProperties
-> = {
+function DatoMovil({
+  titulo,
+  valor,
+}: {
+  titulo: string;
+  valor: string;
+}) {
+  return (
+    <div>
+      <span style={estilos.datoLabel}>
+        {titulo}
+      </span>
+
+      <strong style={estilos.datoValor}>
+        {valor}
+      </strong>
+    </div>
+  );
+}
+
+const estilos: Record<string, React.CSSProperties> = {
   pagina: {
     minHeight: "100vh",
     background: "#f4f7f3",
@@ -789,6 +949,15 @@ const estilos: Record<
   contenido: {
     marginLeft: "235px",
     padding: "32px",
+    boxSizing: "border-box",
+  },
+
+  contenidoMovil: {
+    marginLeft: 0,
+    width: "100%",
+    maxWidth: "100vw",
+    padding: "84px 14px 28px",
+    overflowX: "hidden",
   },
 
   header: {
@@ -799,16 +968,32 @@ const estilos: Record<
     marginBottom: "25px",
   },
 
+  headerMovil: {
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: "16px",
+    marginBottom: "20px",
+  },
+
   titulo: {
     margin: 0,
     fontSize: "28px",
     color: "#143e28",
   },
 
+  tituloMovil: {
+    fontSize: "25px",
+  },
+
   subtitulo: {
     margin: "7px 0 0",
     color: "#718078",
     fontSize: "14px",
+  },
+
+  subtituloMovil: {
+    fontSize: "14px",
+    lineHeight: 1.45,
   },
 
   botonPrincipal: {
@@ -822,6 +1007,13 @@ const estilos: Record<
     cursor: "pointer",
   },
 
+  botonPrincipalMovil: {
+    width: "100%",
+    minHeight: "48px",
+    fontSize: "15px",
+    borderRadius: "11px",
+  },
+
   botonSecundario: {
     background: "white",
     border: "1px solid #d7dfd9",
@@ -833,6 +1025,12 @@ const estilos: Record<
     cursor: "pointer",
   },
 
+  botonFormularioMovil: {
+    width: "100%",
+    minHeight: "48px",
+    fontSize: "14px",
+  },
+
   mensaje: {
     padding: "12px 15px",
     borderRadius: "10px",
@@ -842,10 +1040,15 @@ const estilos: Record<
 
   resumenGrid: {
     display: "grid",
-    gridTemplateColumns:
-      "repeat(3, minmax(0, 1fr))",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
     gap: "18px",
     marginBottom: "22px",
+  },
+
+  resumenGridMovil: {
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    gap: "8px",
+    marginBottom: "18px",
   },
 
   tarjeta: {
@@ -858,10 +1061,21 @@ const estilos: Record<
     gap: "7px",
   },
 
+  tarjetaMovil: {
+    padding: "13px 10px",
+    minWidth: 0,
+    minHeight: "112px",
+  },
+
   tarjetaTitulo: {
     color: "#718078",
     fontSize: "13px",
     fontWeight: 600,
+  },
+
+  tarjetaTituloMovil: {
+    fontSize: "11px",
+    lineHeight: 1.25,
   },
 
   tarjetaValor: {
@@ -869,9 +1083,20 @@ const estilos: Record<
     fontSize: "27px",
   },
 
+  tarjetaValorMovil: {
+    fontSize: "22px",
+    lineHeight: 1.15,
+    wordBreak: "break-word",
+  },
+
   tarjetaDetalle: {
     color: "#98a39c",
     fontSize: "12px",
+  },
+
+  tarjetaDetalleMovil: {
+    fontSize: "10px",
+    lineHeight: 1.3,
   },
 
   formulario: {
@@ -882,17 +1107,32 @@ const estilos: Record<
     marginBottom: "22px",
   },
 
+  formularioMovil: {
+    padding: "16px",
+    borderRadius: "14px",
+    marginBottom: "18px",
+  },
+
   formTitulo: {
     margin: "0 0 20px",
     color: "#244b34",
     fontSize: "18px",
   },
 
+  formTituloMovil: {
+    fontSize: "20px",
+    marginBottom: "20px",
+  },
+
   formGrid: {
     display: "grid",
-    gridTemplateColumns:
-      "repeat(3, minmax(0, 1fr))",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
     gap: "17px",
+  },
+
+  formGridMovil: {
+    gridTemplateColumns: "1fr",
+    gap: "16px",
   },
 
   label: {
@@ -914,11 +1154,22 @@ const estilos: Record<
     background: "white",
   },
 
+  inputMovil: {
+    minHeight: "46px",
+    fontSize: "16px",
+  },
+
   formBotones: {
     display: "flex",
     justifyContent: "flex-end",
     gap: "10px",
     marginTop: "22px",
+  },
+
+  formBotonesMovil: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "10px",
   },
 
   tablaPanel: {
@@ -933,10 +1184,18 @@ const estilos: Record<
     borderBottom: "1px solid #edf1ee",
   },
 
+  tablaHeaderMovil: {
+    padding: "17px 16px",
+  },
+
   tablaTitulo: {
     margin: 0,
     fontSize: "17px",
     color: "#244b34",
+  },
+
+  tablaTituloMovil: {
+    fontSize: "20px",
   },
 
   tablaSubtitulo: {
@@ -988,5 +1247,113 @@ const estilos: Record<
     gap: "9px",
     color: "#829087",
     fontSize: "13px",
+    textAlign: "center",
+    padding: "20px",
+  },
+
+  listaMovil: {
+    padding: "12px",
+  },
+
+  eventoCardMovil: {
+    border: "1px solid #dce6df",
+    borderRadius: "13px",
+    padding: "14px",
+    background: "#ffffff",
+  },
+
+  eventoCardHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: "10px",
+  },
+
+  etiquetaSuperior: {
+    display: "block",
+    fontSize: "10px",
+    fontWeight: 700,
+    letterSpacing: "1.2px",
+    color: "#91a097",
+    marginBottom: "5px",
+  },
+
+  eventoLote: {
+    margin: 0,
+    color: "#164a2e",
+    fontSize: "19px",
+  },
+
+  eventoFecha: {
+    display: "block",
+    marginTop: "5px",
+    color: "#89978f",
+    fontSize: "12px",
+  },
+
+  tipoMovil: {
+    display: "inline-block",
+    background: "#eaf6ee",
+    color: "#176b3a",
+    padding: "7px 10px",
+    borderRadius: "999px",
+    fontSize: "11px",
+    fontWeight: 700,
+    textAlign: "center",
+    maxWidth: "46%",
+  },
+
+  separador: {
+    height: "1px",
+    background: "#edf1ee",
+    margin: "14px 0",
+  },
+
+  cantidadMovil: {
+    background: "#f5f8f6",
+    borderRadius: "10px",
+    padding: "13px",
+    marginBottom: "14px",
+  },
+
+  cantidadValor: {
+    display: "block",
+    marginTop: "5px",
+    color: "#176b3a",
+    fontSize: "26px",
+  },
+
+  cantidadDetalle: {
+    display: "block",
+    marginTop: "2px",
+    color: "#98a39c",
+    fontSize: "11px",
+  },
+
+  detallesGridMovil: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "14px",
+    paddingBottom: "14px",
+    borderBottom: "1px solid #edf1ee",
+  },
+
+  detalleCompletoMovil: {
+    paddingTop: "13px",
+  },
+
+  datoLabel: {
+    display: "block",
+    color: "#89978f",
+    fontSize: "11px",
+    marginBottom: "5px",
+  },
+
+  datoValor: {
+    display: "block",
+    color: "#344d3d",
+    fontSize: "13px",
+    lineHeight: 1.4,
+    overflowWrap: "anywhere",
   },
 };
