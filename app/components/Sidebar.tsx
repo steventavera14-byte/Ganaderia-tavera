@@ -81,7 +81,7 @@ export default function Sidebar() {
     {
       texto: "Maquinaria",
       icono: "🚜",
-      ruta: null,
+      ruta: "/maquinaria",
     },
     {
       texto: "Personal",
