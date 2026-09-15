@@ -28,6 +28,22 @@ type Nacimiento = {
   sexo: string | null;
 };
 
+type MaquinariaAlerta = {
+  id: string;
+  nombre: string;
+  tipo_medicion: string;
+  lectura_actual: number;
+};
+
+type ServicioAlerta = {
+  id: string;
+  maquinaria_id: string;
+  descripcion: string;
+  proxima_fecha: string | null;
+  proxima_lectura: number | null;
+  completado: boolean;
+};
+
 export default function DashboardPage() {
   const router = useRouter();
 
@@ -41,6 +57,11 @@ export default function DashboardPage() {
   const [potreros, setPotreros] = useState<Potrero[]>([]);
   const [nacimientos, setNacimientos] =
     useState<Nacimiento[]>([]);
+
+  const [maquinariaAlertas, setMaquinariaAlertas] =
+    useState<MaquinariaAlerta[]>([]);
+  const [serviciosAlertas, setServiciosAlertas] =
+    useState<ServicioAlerta[]>([]);
 
   useEffect(() => {
     const comprobarPantalla = () => {
@@ -109,6 +130,8 @@ export default function DashboardPage() {
       resultadoLotes,
       resultadoPotreros,
       resultadoNacimientos,
+      resultadoMaquinaria,
+      resultadoServicios,
     ] = await Promise.all([
       supabase
         .from("gan_lotes_ganado")
@@ -157,6 +180,29 @@ export default function DashboardPage() {
           "gan_lotes_ganado.finca_id",
           fincaId
         ),
+
+      supabase
+        .from("gan_maquinaria")
+        .select("id, nombre, tipo_medicion, lectura_actual")
+        .eq("finca_id", fincaId),
+
+      supabase
+        .from("gan_mantenimiento_programado")
+        .select(
+          `
+            id,
+            maquinaria_id,
+            descripcion,
+            proxima_fecha,
+            proxima_lectura,
+            completado,
+            gan_maquinaria!inner (
+              finca_id
+            )
+          `
+        )
+        .eq("completado", false)
+        .eq("gan_maquinaria.finca_id", fincaId),
     ]);
 
     if (resultadoLotes.error) {
@@ -186,6 +232,28 @@ export default function DashboardPage() {
     setNacimientos(
       (resultadoNacimientos.data ||
         []) as unknown as Nacimiento[]
+    );
+
+    if (resultadoMaquinaria.error) {
+      console.error(
+        "Error cargando maquinaria para alertas:",
+        resultadoMaquinaria.error
+      );
+    }
+
+    if (resultadoServicios.error) {
+      console.error(
+        "Error cargando servicios programados:",
+        resultadoServicios.error
+      );
+    }
+
+    setMaquinariaAlertas(
+      (resultadoMaquinaria.data || []) as MaquinariaAlerta[]
+    );
+
+    setServiciosAlertas(
+      (resultadoServicios.data || []) as unknown as ServicioAlerta[]
     );
   };
 
@@ -277,6 +345,104 @@ export default function DashboardPage() {
       )
       .map((lote) => lote.potrero_id)
   ).size;
+
+  const alertasMantenimiento = serviciosAlertas
+    .map((servicio) => {
+      const maquina = maquinariaAlertas.find(
+        (item) => item.id === servicio.maquinaria_id
+      );
+
+      if (!maquina) return null;
+
+      const ahora = new Date();
+      const hoy = new Date(
+        ahora.getFullYear(),
+        ahora.getMonth(),
+        ahora.getDate()
+      );
+
+      let diasRestantes: number | null = null;
+      if (servicio.proxima_fecha) {
+        const [anio, mes, dia] = servicio.proxima_fecha
+          .split("-")
+          .map(Number);
+        const fecha = new Date(anio, mes - 1, dia);
+        diasRestantes = Math.ceil(
+          (fecha.getTime() - hoy.getTime()) / 86400000
+        );
+      }
+
+      let lecturaRestante: number | null = null;
+      if (
+        servicio.proxima_lectura !== null &&
+        servicio.proxima_lectura !== undefined
+      ) {
+        lecturaRestante =
+          Number(servicio.proxima_lectura) -
+          Number(maquina.lectura_actual || 0);
+      }
+
+      const realizarAhora =
+        (diasRestantes !== null && diasRestantes <= 0) ||
+        (lecturaRestante !== null && lecturaRestante <= 0);
+
+      const proximo =
+        !realizarAhora &&
+        ((diasRestantes !== null && diasRestantes <= 10) ||
+          (lecturaRestante !== null && lecturaRestante <= 20));
+
+      if (!realizarAhora && !proximo) return null;
+
+      const detalles: string[] = [];
+
+      if (diasRestantes !== null) {
+        if (diasRestantes > 1) detalles.push(`faltan ${diasRestantes} días`);
+        else if (diasRestantes === 1) detalles.push("falta 1 día");
+        else if (diasRestantes === 0) detalles.push("vence hoy");
+        else detalles.push(`vencido hace ${Math.abs(diasRestantes)} días`);
+      }
+
+      if (lecturaRestante !== null) {
+        const unidad =
+          maquina.tipo_medicion === "km" ? "km" : "h";
+
+        if (lecturaRestante > 0) {
+          detalles.push(
+            `faltan ${lecturaRestante.toLocaleString("es-BO")} ${unidad}`
+          );
+        } else if (lecturaRestante === 0) {
+          detalles.push("lectura alcanzada");
+        } else {
+          detalles.push(
+            `superado por ${Math.abs(lecturaRestante).toLocaleString(
+              "es-BO"
+            )} ${unidad}`
+          );
+        }
+      }
+
+      return {
+        id: servicio.id,
+        maquinariaId: maquina.id,
+        maquina: maquina.nombre,
+        servicio: servicio.descripcion,
+        nivel: realizarAhora ? "urgente" : "proximo",
+        detalle: detalles.join(" · "),
+      };
+    })
+    .filter(Boolean) as {
+      id: string;
+      maquinariaId: string;
+      maquina: string;
+      servicio: string;
+      nivel: "urgente" | "proximo";
+      detalle: string;
+    }[];
+
+  alertasMantenimiento.sort((a, b) => {
+    if (a.nivel === b.nivel) return 0;
+    return a.nivel === "urgente" ? -1 : 1;
+  });
 
   const irA = (ruta: string) => {
     router.push(ruta);
@@ -738,17 +904,56 @@ export default function DashboardPage() {
             icono="🔔"
             titulo="Alertas"
           >
-            <div style={estilos.sinAlertas}>
-              <div style={estilos.checkAlertas}>
-                ✓
+            {alertasMantenimiento.length === 0 ? (
+              <div style={estilos.sinAlertas}>
+                <div style={estilos.checkAlertas}>
+                  ✓
+                </div>
+
+                <strong>Todo al día</strong>
+
+                <span>
+                  No hay mantenimientos próximos ni vencidos.
+                </span>
               </div>
+            ) : (
+              <div style={estilos.listaAlertas}>
+                {alertasMantenimiento.map((alerta) => (
+                  <button
+                    key={alerta.id}
+                    type="button"
+                    onClick={() =>
+                      irA(`/maquinaria/${alerta.maquinariaId}`)
+                    }
+                    style={{
+                      ...estilos.alertaItem,
+                      ...(alerta.nivel === "urgente"
+                        ? estilos.alertaUrgente
+                        : estilos.alertaProxima),
+                    }}
+                  >
+                    <div style={estilos.alertaCabecera}>
+                      <span style={estilos.alertaIcono}>
+                        {alerta.nivel === "urgente" ? "🔴" : "⚠️"}
+                      </span>
 
-              <strong>Todo al día</strong>
+                      <div style={estilos.alertaTexto}>
+                        <strong style={estilos.alertaMaquina}>
+                          {alerta.maquina}
+                        </strong>
+                        <span style={estilos.alertaServicio}>
+                          {alerta.servicio}
+                        </span>
+                      </div>
+                    </div>
 
-              <span>
-                No hay alertas pendientes.
-              </span>
-            </div>
+                    <span style={estilos.alertaDetalle}>
+                      {alerta.detalle}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
           </ResumenPanel>
         </section>
 
@@ -1390,6 +1595,72 @@ const estilos: Record<
     fontSize: "17px",
     fontWeight: 800,
     marginBottom: "3px",
+  },
+
+  listaAlertas: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "8px",
+  },
+
+  alertaItem: {
+    width: "100%",
+    border: "1px solid transparent",
+    borderRadius: "11px",
+    padding: "11px 12px",
+    textAlign: "left",
+    fontFamily: "inherit",
+    cursor: "pointer",
+    boxSizing: "border-box",
+  },
+
+  alertaProxima: {
+    background: "#fff8e8",
+    borderColor: "#f1dfad",
+    color: "#765719",
+  },
+
+  alertaUrgente: {
+    background: "#fff0f0",
+    borderColor: "#efcaca",
+    color: "#8d3434",
+  },
+
+  alertaCabecera: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "8px",
+  },
+
+  alertaIcono: {
+    fontSize: "13px",
+    lineHeight: 1.3,
+  },
+
+  alertaTexto: {
+    minWidth: 0,
+    display: "flex",
+    flexDirection: "column",
+    gap: "2px",
+  },
+
+  alertaMaquina: {
+    fontSize: "11px",
+    lineHeight: 1.25,
+  },
+
+  alertaServicio: {
+    fontSize: "10px",
+    lineHeight: 1.3,
+  },
+
+  alertaDetalle: {
+    display: "block",
+    marginTop: "6px",
+    paddingLeft: "21px",
+    fontSize: "9px",
+    opacity: 0.82,
+    lineHeight: 1.35,
   },
 
   vacio: {
