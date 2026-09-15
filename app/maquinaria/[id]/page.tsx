@@ -75,6 +75,25 @@ type ServicioProgramado = {
   created_at: string;
 };
 
+type UsoMaquinaria = {
+  id: string;
+  maquinaria_id: string;
+  fecha: string;
+  actividad: string;
+  potrero_id: string | null;
+  horas_trabajadas: number | null;
+  kilometros: number | null;
+  operador: string | null;
+  observaciones: string | null;
+  registrado_por: string | null;
+  created_at: string;
+};
+
+type Potrero = {
+  id: string;
+  nombre: string;
+};
+
 export default function FichaMaquinariaPage() {
   const router = useRouter();
   const params = useParams();
@@ -92,6 +111,8 @@ export default function FichaMaquinariaPage() {
   const [combustibles, setCombustibles] = useState<Combustible[]>([]);
   const [mantenimientos, setMantenimientos] = useState<Mantenimiento[]>([]);
   const [serviciosProgramados, setServiciosProgramados] = useState<ServicioProgramado[]>([]);
+  const [usos, setUsos] = useState<UsoMaquinaria[]>([]);
+  const [potreros, setPotreros] = useState<Potrero[]>([]);
 
   const [mostrarLecturas, setMostrarLecturas] = useState(false);
   const [mostrarFormularioLectura, setMostrarFormularioLectura] =
@@ -110,10 +131,14 @@ export default function FichaMaquinariaPage() {
   const [mostrarFormularioServicioProgramado, setMostrarFormularioServicioProgramado] =
     useState(false);
 
+  const [mostrarUsos, setMostrarUsos] = useState(false);
+  const [mostrarFormularioUso, setMostrarFormularioUso] = useState(false);
+
   const [guardandoLectura, setGuardandoLectura] = useState(false);
   const [guardandoCombustible, setGuardandoCombustible] = useState(false);
   const [guardandoMantenimiento, setGuardandoMantenimiento] = useState(false);
   const [guardandoServicioProgramado, setGuardandoServicioProgramado] = useState(false);
+  const [guardandoUso, setGuardandoUso] = useState(false);
 
   const [fechaLectura, setFechaLectura] = useState(
     new Date().toISOString().split("T")[0]
@@ -147,6 +172,14 @@ export default function FichaMaquinariaPage() {
   const [fechaServicioProgramado, setFechaServicioProgramado] = useState("");
   const [lecturaServicioProgramado, setLecturaServicioProgramado] = useState("");
   const [observacionServicioProgramado, setObservacionServicioProgramado] = useState("");
+
+  const [fechaUso, setFechaUso] = useState(new Date().toISOString().split("T")[0]);
+  const [actividadUso, setActividadUso] = useState("");
+  const [potreroUso, setPotreroUso] = useState("");
+  const [horasUso, setHorasUso] = useState("");
+  const [kilometrosUso, setKilometrosUso] = useState("");
+  const [operadorUso, setOperadorUso] = useState("");
+  const [observacionUso, setObservacionUso] = useState("");
 
   useEffect(() => {
     if (maquinaId) {
@@ -193,6 +226,8 @@ export default function FichaMaquinariaPage() {
       await cargarCombustibles();
       await cargarMantenimientos();
       await cargarServiciosProgramados();
+      await cargarUsos();
+      await cargarPotreros(membresia.finca_id);
     } catch (err: any) {
       console.error(err);
       setError(
@@ -295,6 +330,33 @@ export default function FichaMaquinariaPage() {
     if (errorServicios) throw errorServicios;
 
     setServiciosProgramados((data || []) as ServicioProgramado[]);
+  }
+
+  async function cargarUsos() {
+    if (!maquinaId) return;
+
+    const { data, error: errorUsos } = await supabase
+      .from("gan_maquinaria_uso")
+      .select("*")
+      .eq("maquinaria_id", maquinaId)
+      .order("fecha", { ascending: false })
+      .order("created_at", { ascending: false });
+
+    if (errorUsos) throw errorUsos;
+
+    setUsos((data || []) as UsoMaquinaria[]);
+  }
+
+  async function cargarPotreros(fincaId: string) {
+    const { data, error: errorPotreros } = await supabase
+      .from("gan_potreros")
+      .select("id, nombre")
+      .eq("finca_id", fincaId)
+      .order("nombre", { ascending: true });
+
+    if (errorPotreros) throw errorPotreros;
+
+    setPotreros((data || []) as Potrero[]);
   }
 
   function abrirLecturas() {
@@ -851,6 +913,103 @@ export default function FichaMaquinariaPage() {
     }
 
     return partes.join(" · ");
+  }
+
+  function abrirUsos() {
+    setMostrarUsos(true);
+    setMostrarFormularioUso(false);
+    setMensaje("");
+    setError("");
+  }
+
+  function cerrarUsos() {
+    setMostrarUsos(false);
+    setMostrarFormularioUso(false);
+    setMensaje("");
+    setError("");
+  }
+
+  function abrirNuevoUso() {
+    setFechaUso(new Date().toISOString().split("T")[0]);
+    setActividadUso("");
+    setPotreroUso("");
+    setHorasUso("");
+    setKilometrosUso("");
+    setOperadorUso("");
+    setObservacionUso("");
+    setError("");
+    setMensaje("");
+    setMostrarFormularioUso(true);
+  }
+
+  async function registrarUso(e: React.FormEvent) {
+    e.preventDefault();
+    if (!maquinaId) return;
+
+    const horas = horasUso.trim() === "" ? null : Number(horasUso);
+    const kilometros =
+      kilometrosUso.trim() === "" ? null : Number(kilometrosUso);
+
+    if (!fechaUso) return setError("Selecciona la fecha del trabajo.");
+    if (!actividadUso.trim()) return setError("Ingresa la actividad realizada.");
+
+    if (horas !== null && (Number.isNaN(horas) || horas < 0)) {
+      return setError("Ingresa una cantidad de horas válida.");
+    }
+
+    if (kilometros !== null && (Number.isNaN(kilometros) || kilometros < 0)) {
+      return setError("Ingresa una cantidad de kilómetros válida.");
+    }
+
+    try {
+      setGuardandoUso(true);
+      setError("");
+      setMensaje("");
+
+      const { error: errorRpc } = await supabase.rpc(
+        "gan_registrar_uso_maquinaria",
+        {
+          p_maquinaria_id: maquinaId,
+          p_fecha: fechaUso,
+          p_actividad: actividadUso.trim(),
+          p_potrero_id: potreroUso || null,
+          p_horas_trabajadas: horas,
+          p_kilometros: kilometros,
+          p_operador: operadorUso.trim() || null,
+          p_observaciones: observacionUso.trim() || null,
+        }
+      );
+
+      if (errorRpc) throw errorRpc;
+
+      await cargarUsos();
+      setMostrarFormularioUso(false);
+      setMensaje("Trabajo registrado correctamente.");
+    } catch (err: any) {
+      console.error(err);
+      setError(err?.message || "No se pudo registrar el trabajo.");
+    } finally {
+      setGuardandoUso(false);
+    }
+  }
+
+  function nombrePotrero(id: string | null) {
+    if (!id) return "—";
+    return potreros.find((item) => item.id === id)?.nombre || "—";
+  }
+
+  function totalHorasUso() {
+    return usos.reduce(
+      (total, item) => total + Number(item.horas_trabajadas || 0),
+      0
+    );
+  }
+
+  function totalKilometrosUso() {
+    return usos.reduce(
+      (total, item) => total + Number(item.kilometros || 0),
+      0
+    );
   }
 
   function etiquetaEstado(estado: Maquinaria["estado"]) {
@@ -1977,6 +2136,203 @@ export default function FichaMaquinariaPage() {
               </section>
             )}
 
+            {mostrarUsos && (
+              <section className="panel panel-usos">
+                <div className="titulo-panel">
+                  <div>
+                    <div className="eyebrow">CONTROL DE TRABAJOS</div>
+                    <h2>Uso / trabajos</h2>
+                    <p>Historial de actividades, potreros, operadores, horas y kilómetros.</p>
+                  </div>
+                  <button type="button" className="boton-cerrar" onClick={cerrarUsos}>
+                    ×
+                  </button>
+                </div>
+
+                <div className="usos-resumen">
+                  <div>
+                    <span>Trabajos</span>
+                    <strong>{usos.length}</strong>
+                  </div>
+                  <div>
+                    <span>Horas registradas</span>
+                    <strong>{formatearNumero(totalHorasUso())} h</strong>
+                  </div>
+                  <div>
+                    <span>Kilómetros registrados</span>
+                    <strong>{formatearNumero(totalKilometrosUso())} km</strong>
+                  </div>
+                  <button type="button" className="boton-principal" onClick={abrirNuevoUso}>
+                    + Registrar trabajo
+                  </button>
+                </div>
+
+                {mostrarFormularioUso && (
+                  <form className="form-uso" onSubmit={registrarUso}>
+                    <div className="form-uso-grid">
+                      <label>
+                        <span>Fecha *</span>
+                        <input
+                          type="date"
+                          value={fechaUso}
+                          onChange={(e) => setFechaUso(e.target.value)}
+                          required
+                        />
+                      </label>
+
+                      <label>
+                        <span>Potrero</span>
+                        <select
+                          value={potreroUso}
+                          onChange={(e) => setPotreroUso(e.target.value)}
+                        >
+                          <option value="">Sin potrero específico</option>
+                          {potreros.map((potrero) => (
+                            <option key={potrero.id} value={potrero.id}>
+                              {potrero.nombre}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label className="campo-completo">
+                        <span>Actividad *</span>
+                        <input
+                          type="text"
+                          value={actividadUso}
+                          onChange={(e) => setActividadUso(e.target.value)}
+                          placeholder="Ej. Preparación de potrero, fumigación, transporte"
+                          required
+                        />
+                      </label>
+
+                      <label>
+                        <span>Horas trabajadas</span>
+                        <div className="input-unidad">
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            inputMode="decimal"
+                            value={horasUso}
+                            onChange={(e) => setHorasUso(e.target.value)}
+                            placeholder="0"
+                          />
+                          <span>h</span>
+                        </div>
+                      </label>
+
+                      <label>
+                        <span>Kilómetros</span>
+                        <div className="input-unidad">
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            inputMode="decimal"
+                            value={kilometrosUso}
+                            onChange={(e) => setKilometrosUso(e.target.value)}
+                            placeholder="0"
+                          />
+                          <span>km</span>
+                        </div>
+                      </label>
+
+                      <label className="campo-completo">
+                        <span>Operador</span>
+                        <input
+                          type="text"
+                          value={operadorUso}
+                          onChange={(e) => setOperadorUso(e.target.value)}
+                          placeholder="Nombre del operador"
+                        />
+                      </label>
+
+                      <label className="campo-completo">
+                        <span>Observaciones</span>
+                        <textarea
+                          value={observacionUso}
+                          onChange={(e) => setObservacionUso(e.target.value)}
+                          rows={3}
+                          placeholder="Detalles adicionales del trabajo realizado."
+                        />
+                      </label>
+                    </div>
+
+                    <div className="acciones-form">
+                      <button
+                        type="button"
+                        className="boton-secundario"
+                        onClick={() => setMostrarFormularioUso(false)}
+                        disabled={guardandoUso}
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="submit"
+                        className="boton-principal"
+                        disabled={guardandoUso}
+                      >
+                        {guardandoUso ? "Guardando..." : "Guardar trabajo"}
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                <div className="historial-cabecera">
+                  <h3>Historial de trabajos</h3>
+                  <span>
+                    {usos.length} {usos.length === 1 ? "registro" : "registros"}
+                  </span>
+                </div>
+
+                {usos.length === 0 ? (
+                  <div className="sin-lecturas">
+                    <div>🚜</div>
+                    <strong>No hay trabajos registrados todavía</strong>
+                    <p>Registra la primera actividad realizada con este equipo.</p>
+                  </div>
+                ) : (
+                  <div className="tabla-contenedor">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Fecha</th>
+                          <th>Actividad</th>
+                          <th>Potrero</th>
+                          <th>Horas</th>
+                          <th>Km</th>
+                          <th>Operador</th>
+                          <th>Observación</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {usos.map((item) => (
+                          <tr key={item.id}>
+                            <td data-label="Fecha">{formatearFecha(item.fecha)}</td>
+                            <td data-label="Actividad"><strong>{item.actividad}</strong></td>
+                            <td data-label="Potrero">{nombrePotrero(item.potrero_id)}</td>
+                            <td data-label="Horas">
+                              {item.horas_trabajadas === null || item.horas_trabajadas === undefined
+                                ? "—"
+                                : `${formatearNumero(Number(item.horas_trabajadas))} h`}
+                            </td>
+                            <td data-label="Km">
+                              {item.kilometros === null || item.kilometros === undefined
+                                ? "—"
+                                : `${formatearNumero(Number(item.kilometros))} km`}
+                            </td>
+                            <td data-label="Operador">{item.operador || "—"}</td>
+                            <td data-label="Observación">{item.observaciones || "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </section>
+            )}
+
             <section className="panel">
               <div className="titulo-panel">
                 <div>
@@ -2086,11 +2442,24 @@ export default function FichaMaquinariaPage() {
                   <span className="disponible">Abrir →</span>
                 </button>
 
-                <Modulo
-                  icono="🚜"
-                  titulo="Uso / trabajos"
-                  descripcion="Actividad, potrero, operador y horas trabajadas."
-                />
+                <button
+                  type="button"
+                  className="modulo modulo-activo"
+                  onClick={abrirUsos}
+                >
+                  <div className="modulo-icono">🚜</div>
+                  <div className="modulo-texto">
+                    <strong>Uso / trabajos</strong>
+                    <p>
+                      {usos.length === 0
+                        ? "Actividad, potrero, operador y horas trabajadas."
+                        : `${usos.length} ${
+                            usos.length === 1 ? "trabajo" : "trabajos"
+                          } · ${formatearNumero(totalHorasUso())} h`}
+                    </p>
+                  </div>
+                  <span className="disponible">Abrir →</span>
+                </button>
 
                 <Modulo
                   icono="$"
@@ -2389,6 +2758,10 @@ const estilos = `
   }
 
   .panel-servicios {
+    border-top: 4px solid #2d7545;
+  }
+
+  .panel-usos {
     border-top: 4px solid #2d7545;
   }
 
@@ -2758,7 +3131,8 @@ const estilos = `
     box-shadow: 0 0 0 3px rgba(60, 134, 86, 0.09);
   }
 
-  .servicios-resumen {
+  .servicios-resumen,
+  .usos-resumen {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
     align-items: center;
@@ -2792,7 +3166,8 @@ const estilos = `
     margin-bottom: 20px;
   }
 
-  .form-servicio-grid {
+  .form-servicio-grid,
+  .form-uso-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 14px;
@@ -3075,6 +3450,71 @@ const estilos = `
     color: #647168;
   }
 
+  .form-uso {
+    border: 1px solid #dce6de;
+    background: #fbfcfb;
+    border-radius: 13px;
+    padding: 17px;
+    margin-bottom: 20px;
+  }
+
+  .form-uso label {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .form-uso label > span,
+  .usos-resumen span {
+    color: #405046;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .usos-resumen span {
+    display: block;
+    color: #738078;
+    font-size: 11px;
+  }
+
+  .usos-resumen strong {
+    display: block;
+    color: #173d27;
+    font-size: 20px;
+    margin-top: 4px;
+    overflow-wrap: anywhere;
+  }
+
+  .form-uso input,
+  .form-uso select,
+  .form-uso textarea {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #ccd6ce;
+    border-radius: 9px;
+    background: white;
+    color: #1e2e23;
+    padding: 10px 11px;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+  }
+
+  .form-uso select {
+    min-height: 42px;
+  }
+
+  .form-uso textarea {
+    resize: vertical;
+  }
+
+  .form-uso input:focus,
+  .form-uso select:focus,
+  .form-uso textarea:focus {
+    border-color: #3c8656;
+    box-shadow: 0 0 0 3px rgba(60, 134, 86, 0.09);
+  }
+
   @media (max-width: 1100px) {
     .resumen {
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3198,13 +3638,15 @@ const estilos = `
 
     .combustible-resumen .boton-principal,
     .mantenimiento-resumen .boton-principal,
-    .servicios-resumen .boton-principal {
+    .servicios-resumen .boton-principal,
+    .usos-resumen .boton-principal {
       grid-column: 1 / -1;
       width: 100%;
     }
 
     .mantenimiento-resumen,
-    .servicios-resumen {
+    .servicios-resumen,
+    .usos-resumen {
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }
   }
@@ -3213,19 +3655,22 @@ const estilos = `
     .form-lectura-grid,
     .form-combustible-grid,
     .form-mantenimiento-grid,
-    .form-servicio-grid {
+    .form-servicio-grid,
+    .form-uso-grid {
       grid-template-columns: 1fr;
     }
 
     .combustible-resumen,
     .mantenimiento-resumen,
-    .servicios-resumen {
+    .servicios-resumen,
+    .usos-resumen {
       grid-template-columns: 1fr;
     }
 
     .combustible-resumen .boton-principal,
     .mantenimiento-resumen .boton-principal,
-    .servicios-resumen .boton-principal {
+    .servicios-resumen .boton-principal,
+    .usos-resumen .boton-principal {
       grid-column: auto;
     }
 
