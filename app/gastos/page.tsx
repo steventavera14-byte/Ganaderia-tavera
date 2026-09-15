@@ -476,10 +476,17 @@ export default function GastosPage() {
   };
 
   const abrirAsignacion = (gasto: Gasto) => {
+    const yaAsignado = asignaciones
+      .filter((a) => a.gasto_id === gasto.id)
+      .reduce((suma, a) => suma + Number(a.porcentaje), 0);
+    const restante = Math.max(0, 100 - yaAsignado);
+
     setGastoAsignando(gasto);
     setTipoAsignacion("general");
     setReferenciaAsignacionId("");
-    setPorcentajeAsignacion("100");
+    setPorcentajeAsignacion(
+      restante > 0 ? String(Number(restante.toFixed(2))) : "0"
+    );
     setObservacionAsignacion("");
     setMensaje("");
     setError("");
@@ -562,7 +569,7 @@ export default function GastosPage() {
 
     setTipoAsignacion("general");
     setReferenciaAsignacionId("");
-    setPorcentajeAsignacion("100");
+    setPorcentajeAsignacion("0");
     setObservacionAsignacion("");
     setMensaje("Asignación guardada correctamente.");
     await cargarDatos();
@@ -594,6 +601,15 @@ export default function GastosPage() {
 
   const asignacionesDeGasto = (gastoId: string) =>
     asignaciones.filter((a) => a.gasto_id === gastoId);
+
+  const porcentajeAsignadoDeGasto = (gastoId: string) =>
+    asignacionesDeGasto(gastoId).reduce(
+      (suma, asignacion) => suma + Number(asignacion.porcentaje),
+      0
+    );
+
+  const gastoAsignadoAlCien = (gastoId: string) =>
+    porcentajeAsignadoDeGasto(gastoId) >= 99.9999;
 
   const gastosFiltrados = useMemo(() => {
     const texto = busqueda.trim().toLowerCase();
@@ -856,6 +872,19 @@ export default function GastosPage() {
               </button>
             </div>
 
+            {gastoAsignadoAlCien(gastoAsignando.id) ? (
+              <div style={estilos.asignacionCompleta}>
+                <div style={estilos.asignacionCompletaIcono}>✓</div>
+                <div>
+                  <div style={estilos.asignacionCompletaTitulo}>
+                    Gasto asignado al 100%
+                  </div>
+                  <div style={estilos.asignacionCompletaTexto}>
+                    La distribución de este gasto está completa.
+                  </div>
+                </div>
+              </div>
+            ) : (
             <form onSubmit={guardarAsignacion}>
               <div style={estilos.formGrid}>
                 <Campo label="Destino">
@@ -929,6 +958,7 @@ export default function GastosPage() {
                 </button>
               </div>
             </form>
+            )}
 
             <div style={estilos.asignacionesActuales}>
               <div style={estilos.label}>ASIGNACIONES ACTUALES</div>
@@ -1281,6 +1311,17 @@ export default function GastosPage() {
                   <div style={estilos.accionesFilaMovil}>
                     <button
                       type="button"
+                      style={
+                        gastoAsignadoAlCien(gasto.id)
+                          ? estilos.botonAsignadoCompleto
+                          : estilos.botonAsignar
+                      }
+                      onClick={() => abrirAsignacion(gasto)}
+                    >
+                      {gastoAsignadoAlCien(gasto.id) ? "✓ 100%" : "Asignar"}
+                    </button>
+                    <button
+                      type="button"
                       style={estilos.botonEditar}
                       onClick={() => cargarGastoParaEditar(gasto)}
                     >
@@ -1368,10 +1409,14 @@ export default function GastosPage() {
                       <td style={{ ...estilos.td, textAlign: "right", whiteSpace: "nowrap" }}>
                         <button
                           type="button"
-                          style={estilos.botonAsignar}
+                          style={
+                            gastoAsignadoAlCien(gasto.id)
+                              ? estilos.botonAsignadoCompleto
+                              : estilos.botonAsignar
+                          }
                           onClick={() => abrirAsignacion(gasto)}
                         >
-                          Asignar
+                          {gastoAsignadoAlCien(gasto.id) ? "✓ 100%" : "Asignar"}
                         </button>
                         <button
                           type="button"
@@ -1734,6 +1779,50 @@ const estilos: Record<string, React.CSSProperties> = {
     color: "#667a6e",
     fontSize: "10px",
     lineHeight: 1.45,
+  },
+  asignacionCompleta: {
+    marginTop: "18px",
+    padding: "16px",
+    borderRadius: "12px",
+    border: "1px solid #bfe3cc",
+    background: "#eaf7ef",
+    color: "#176b3a",
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+  },
+  asignacionCompletaIcono: {
+    width: "34px",
+    height: "34px",
+    borderRadius: "50%",
+    background: "#176b3a",
+    color: "white",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontWeight: 900,
+    fontSize: "18px",
+    flexShrink: 0,
+  },
+  asignacionCompletaTitulo: {
+    fontSize: "14px",
+    fontWeight: 900,
+  },
+  asignacionCompletaTexto: {
+    marginTop: "2px",
+    fontSize: "11px",
+    color: "#568068",
+  },
+  botonAsignadoCompleto: {
+    border: "1px solid #bfe3cc",
+    borderRadius: "8px",
+    background: "#eaf7ef",
+    color: "#176b3a",
+    padding: "8px 10px",
+    fontWeight: 850,
+    fontSize: "11px",
+    cursor: "pointer",
+    fontFamily: "inherit",
   },
   asignacionesActuales: {
     marginTop: "18px",
