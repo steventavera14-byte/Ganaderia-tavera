@@ -33,15 +33,14 @@ type Movimiento = {
 export default function MovimientosPage() {
   const [loading, setLoading] = useState(true);
   const [guardando, setGuardando] = useState(false);
-  const [mostrarFormulario, setMostrarFormulario] =
-    useState(false);
+  const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [mensaje, setMensaje] = useState("");
+  const [esMovil, setEsMovil] = useState(false);
 
   const [fincaId, setFincaId] = useState("");
   const [lotes, setLotes] = useState<Lote[]>([]);
   const [potreros, setPotreros] = useState<Potrero[]>([]);
-  const [movimientos, setMovimientos] =
-    useState<Movimiento[]>([]);
+  const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
 
   const [form, setForm] = useState({
     fecha: new Date().toISOString().split("T")[0],
@@ -57,6 +56,19 @@ export default function MovimientosPage() {
     iniciar();
   }, []);
 
+  useEffect(() => {
+    const actualizar = () => {
+      setEsMovil(window.innerWidth <= 820);
+    };
+
+    actualizar();
+    window.addEventListener("resize", actualizar);
+
+    return () => {
+      window.removeEventListener("resize", actualizar);
+    };
+  }, []);
+
   const iniciar = async () => {
     setLoading(true);
 
@@ -69,13 +81,12 @@ export default function MovimientosPage() {
       return;
     }
 
-    const { data: usuario, error: errorUsuario } =
-      await supabase
-        .from("gan_usuarios")
-        .select("finca_id")
-        .eq("user_id", user.id)
-        .eq("activo", true)
-        .maybeSingle();
+    const { data: usuario, error: errorUsuario } = await supabase
+      .from("gan_usuarios")
+      .select("finca_id")
+      .eq("user_id", user.id)
+      .eq("activo", true)
+      .maybeSingle();
 
     if (errorUsuario || !usuario) {
       await supabase.auth.signOut();
@@ -97,17 +108,13 @@ export default function MovimientosPage() {
   const cargarLotes = async (idFinca: string) => {
     const { data, error } = await supabase
       .from("gan_lotes_ganado")
-      .select(
-        "id, nombre, cantidad_total, potrero_id"
-      )
+      .select("id, nombre, cantidad_total, potrero_id")
       .eq("finca_id", idFinca)
       .in("estado", ["activo", "feedlot"])
       .order("nombre");
 
     if (error) {
-      setMensaje(
-        `Error al cargar lotes: ${error.message}`
-      );
+      setMensaje(`Error al cargar lotes: ${error.message}`);
       return;
     }
 
@@ -122,18 +129,14 @@ export default function MovimientosPage() {
       .order("nombre");
 
     if (error) {
-      setMensaje(
-        `Error al cargar potreros: ${error.message}`
-      );
+      setMensaje(`Error al cargar potreros: ${error.message}`);
       return;
     }
 
     setPotreros((data || []) as Potrero[]);
   };
 
-  const cargarMovimientos = async (
-    idFinca: string
-  ) => {
+  const cargarMovimientos = async (idFinca: string) => {
     const { data, error } = await supabase
       .from("gan_lote_movimientos")
       .select(`
@@ -150,62 +153,43 @@ export default function MovimientosPage() {
           finca_id
         )
       `)
-      .eq(
-        "gan_lotes_ganado.finca_id",
-        idFinca
-      )
+      .eq("gan_lotes_ganado.finca_id", idFinca)
       .order("fecha", { ascending: false });
 
     if (error) {
-      setMensaje(
-        `Error al cargar movimientos: ${error.message}`
-      );
+      setMensaje(`Error al cargar movimientos: ${error.message}`);
       return;
     }
 
-    setMovimientos(
-      (data || []) as unknown as Movimiento[]
-    );
+    setMovimientos((data || []) as unknown as Movimiento[]);
   };
 
   const seleccionarLote = (loteId: string) => {
-    const lote = lotes.find(
-      (item) => item.id === loteId
-    );
+    const lote = lotes.find((item) => item.id === loteId);
 
     setForm((anterior) => ({
       ...anterior,
       lote_id: loteId,
-      potrero_origen_id:
-        lote?.potrero_id || "",
-      cantidad_animales: lote
-        ? String(lote.cantidad_total)
-        : "",
+      potrero_origen_id: lote?.potrero_id || "",
+      cantidad_animales: lote ? String(lote.cantidad_total) : "",
       potrero_destino_id: "",
     }));
   };
 
-  const nombrePotrero = (
-    potreroId: string | null
-  ) => {
+  const nombrePotrero = (potreroId: string | null) => {
     if (!potreroId) return "Sin potrero";
 
     return (
-      potreros.find(
-        (potrero) => potrero.id === potreroId
-      )?.nombre || "Potrero no disponible"
+      potreros.find((potrero) => potrero.id === potreroId)?.nombre ||
+      "Potrero no disponible"
     );
   };
 
-  const guardarMovimiento = async (
-    e: React.FormEvent
-  ) => {
+  const guardarMovimiento = async (e: React.FormEvent) => {
     e.preventDefault();
     setMensaje("");
 
-    const lote = lotes.find(
-      (item) => item.id === form.lote_id
-    );
+    const lote = lotes.find((item) => item.id === form.lote_id);
 
     if (!lote) {
       setMensaje("Debes seleccionar un lote.");
@@ -213,34 +197,21 @@ export default function MovimientosPage() {
     }
 
     if (!form.potrero_destino_id) {
-      setMensaje(
-        "Debes seleccionar el potrero de destino."
-      );
+      setMensaje("Debes seleccionar el potrero de destino.");
       return;
     }
 
-    if (
-      form.potrero_destino_id ===
-      form.potrero_origen_id
-    ) {
+    if (form.potrero_destino_id === form.potrero_origen_id) {
       setMensaje(
         "El potrero de destino debe ser diferente al potrero actual."
       );
       return;
     }
 
-    /*
-      Por ahora solo permitimos movimientos
-      del lote completo.
-    */
-    const cantidad = Number(
-      lote.cantidad_total
-    );
+    const cantidad = Number(lote.cantidad_total);
 
     if (cantidad <= 0) {
-      setMensaje(
-        "El lote no tiene animales para mover."
-      );
+      setMensaje("El lote no tiene animales para mover.");
       return;
     }
 
@@ -255,27 +226,18 @@ export default function MovimientosPage() {
       return;
     }
 
-    /*
-      PASO 1:
-      Registrar el movimiento histórico.
-    */
-    const { error: errorMovimiento } =
-      await supabase
-        .from("gan_lote_movimientos")
-        .insert({
-          lote_id: lote.id,
-          potrero_origen_id:
-            lote.potrero_id || null,
-          potrero_destino_id:
-            form.potrero_destino_id,
-          fecha: form.fecha,
-          cantidad_animales: cantidad,
-          motivo:
-            form.motivo.trim() || null,
-          observaciones:
-            form.observaciones.trim() || null,
-          registrado_por: user.id,
-        });
+    const { error: errorMovimiento } = await supabase
+      .from("gan_lote_movimientos")
+      .insert({
+        lote_id: lote.id,
+        potrero_origen_id: lote.potrero_id || null,
+        potrero_destino_id: form.potrero_destino_id,
+        fecha: form.fecha,
+        cantidad_animales: cantidad,
+        motivo: form.motivo.trim() || null,
+        observaciones: form.observaciones.trim() || null,
+        registrado_por: user.id,
+      });
 
     if (errorMovimiento) {
       setMensaje(
@@ -285,18 +247,12 @@ export default function MovimientosPage() {
       return;
     }
 
-    /*
-      PASO 2:
-      Actualizar el potrero actual del lote.
-    */
-    const { error: errorLote } =
-      await supabase
-        .from("gan_lotes_ganado")
-        .update({
-          potrero_id:
-            form.potrero_destino_id,
-        })
-        .eq("id", lote.id);
+    const { error: errorLote } = await supabase
+      .from("gan_lotes_ganado")
+      .update({
+        potrero_id: form.potrero_destino_id,
+      })
+      .eq("id", lote.id);
 
     if (errorLote) {
       setMensaje(
@@ -307,8 +263,7 @@ export default function MovimientosPage() {
     }
 
     setForm({
-      fecha:
-        new Date().toISOString().split("T")[0],
+      fecha: new Date().toISOString().split("T")[0],
       lote_id: "",
       potrero_origen_id: "",
       potrero_destino_id: "",
@@ -318,10 +273,7 @@ export default function MovimientosPage() {
     });
 
     setMostrarFormulario(false);
-
-    setMensaje(
-      "Movimiento registrado correctamente."
-    );
+    setMensaje("Movimiento registrado correctamente.");
 
     await Promise.all([
       cargarLotes(fincaId),
@@ -332,15 +284,12 @@ export default function MovimientosPage() {
   };
 
   const formatearFecha = (fecha: string) => {
-    return new Date(fecha).toLocaleDateString(
-      "es-BO",
-      {
-        timeZone: "UTC",
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      }
-    );
+    return new Date(fecha).toLocaleDateString("es-BO", {
+      timeZone: "UTC",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
   };
 
   if (loading) {
@@ -355,25 +304,46 @@ export default function MovimientosPage() {
     <main style={estilos.pagina}>
       <Sidebar />
 
-      <section style={estilos.contenido}>
-        <header style={estilos.header}>
+      <section
+        style={{
+          ...estilos.contenido,
+          ...(esMovil ? estilos.contenidoMovil : {}),
+        }}
+      >
+        <header
+          style={{
+            ...estilos.header,
+            ...(esMovil ? estilos.headerMovil : {}),
+          }}
+        >
           <div>
-            <h1 style={estilos.titulo}>
+            <h1
+              style={{
+                ...estilos.titulo,
+                ...(esMovil ? estilos.tituloMovil : {}),
+              }}
+            >
               Movimientos
             </h1>
 
-            <p style={estilos.subtitulo}>
+            <p
+              style={{
+                ...estilos.subtitulo,
+                ...(esMovil ? estilos.subtituloMovil : {}),
+              }}
+            >
               Traslado de lotes entre potreros
             </p>
           </div>
 
           <button
-            style={estilos.botonPrincipal}
+            style={{
+              ...estilos.botonPrincipal,
+              ...(esMovil ? estilos.botonPrincipalMovil : {}),
+            }}
             onClick={() => {
               setMensaje("");
-              setMostrarFormulario(
-                !mostrarFormulario
-              );
+              setMostrarFormulario(!mostrarFormulario);
             }}
           >
             {mostrarFormulario
@@ -386,30 +356,27 @@ export default function MovimientosPage() {
           <div
             style={{
               ...estilos.mensaje,
-              background:
-                mensaje.includes(
-                  "correctamente"
-                )
-                  ? "#edf8f0"
-                  : "#fff1f1",
-              color:
-                mensaje.includes(
-                  "correctamente"
-                )
-                  ? "#176b3a"
-                  : "#b42318",
+              background: mensaje.includes("correctamente")
+                ? "#edf8f0"
+                : "#fff1f1",
+              color: mensaje.includes("correctamente")
+                ? "#176b3a"
+                : "#b42318",
             }}
           >
             {mensaje}
           </div>
         )}
 
-        <div style={estilos.resumenGrid}>
+        <div
+          style={{
+            ...estilos.resumenGrid,
+            ...(esMovil ? estilos.resumenGridMovil : {}),
+          }}
+        >
           <Tarjeta
             titulo="Movimientos"
-            valor={String(
-              movimientos.length
-            )}
+            valor={String(movimientos.length)}
             detalle="Traslados registrados"
           />
 
@@ -429,25 +396,29 @@ export default function MovimientosPage() {
         {mostrarFormulario && (
           <form
             onSubmit={guardarMovimiento}
-            style={estilos.formulario}
+            style={{
+              ...estilos.formulario,
+              ...(esMovil ? estilos.formularioMovil : {}),
+            }}
           >
             <h2 style={estilos.formTitulo}>
               Registrar movimiento
             </h2>
 
             <div style={estilos.aviso}>
-              Por ahora este módulo mueve el
-              lote completo. Los movimientos
-              parciales se habilitarán mediante
-              división de lotes.
+              Por ahora este módulo mueve el lote completo. Los
+              movimientos parciales se habilitarán mediante división
+              de lotes.
             </div>
 
-            <div style={estilos.formGrid}>
+            <div
+              style={{
+                ...estilos.formGrid,
+                ...(esMovil ? estilos.formGridMovil : {}),
+              }}
+            >
               <div>
-                <label style={estilos.label}>
-                  Fecha *
-                </label>
-
+                <label style={estilos.label}>Fecha *</label>
                 <input
                   type="date"
                   value={form.fecha}
@@ -463,32 +434,20 @@ export default function MovimientosPage() {
               </div>
 
               <div>
-                <label style={estilos.label}>
-                  Lote *
-                </label>
-
+                <label style={estilos.label}>Lote *</label>
                 <select
                   value={form.lote_id}
                   onChange={(e) =>
-                    seleccionarLote(
-                      e.target.value
-                    )
+                    seleccionarLote(e.target.value)
                   }
                   style={estilos.input}
                   required
                 >
-                  <option value="">
-                    Seleccionar lote
-                  </option>
+                  <option value="">Seleccionar lote</option>
 
                   {lotes.map((lote) => (
-                    <option
-                      key={lote.id}
-                      value={lote.id}
-                    >
-                      {lote.nombre} —{" "}
-                      {lote.cantidad_total}{" "}
-                      animales
+                    <option key={lote.id} value={lote.id}>
+                      {lote.nombre} — {lote.cantidad_total} animales
                     </option>
                   ))}
                 </select>
@@ -501,9 +460,7 @@ export default function MovimientosPage() {
 
                 <input
                   type="number"
-                  value={
-                    form.cantidad_animales
-                  }
+                  value={form.cantidad_animales}
                   disabled
                   style={{
                     ...estilos.input,
@@ -521,9 +478,7 @@ export default function MovimientosPage() {
                   type="text"
                   value={
                     form.lote_id
-                      ? nombrePotrero(
-                          form.potrero_origen_id
-                        )
+                      ? nombrePotrero(form.potrero_origen_id)
                       : ""
                   }
                   disabled
@@ -541,28 +496,22 @@ export default function MovimientosPage() {
                 </label>
 
                 <select
-                  value={
-                    form.potrero_destino_id
-                  }
+                  value={form.potrero_destino_id}
                   onChange={(e) =>
                     setForm({
                       ...form,
-                      potrero_destino_id:
-                        e.target.value,
+                      potrero_destino_id: e.target.value,
                     })
                   }
                   style={estilos.input}
                   required
                 >
-                  <option value="">
-                    Seleccionar destino
-                  </option>
+                  <option value="">Seleccionar destino</option>
 
                   {potreros
                     .filter(
                       (potrero) =>
-                        potrero.id !==
-                        form.potrero_origen_id
+                        potrero.id !== form.potrero_origen_id
                     )
                     .map((potrero) => (
                       <option
@@ -576,9 +525,7 @@ export default function MovimientosPage() {
               </div>
 
               <div>
-                <label style={estilos.label}>
-                  Motivo
-                </label>
+                <label style={estilos.label}>Motivo</label>
 
                 <select
                   value={form.motivo}
@@ -590,73 +537,61 @@ export default function MovimientosPage() {
                   }
                   style={estilos.input}
                 >
-                  <option value="">
-                    Seleccionar motivo
-                  </option>
-
+                  <option value="">Seleccionar motivo</option>
                   <option value="Rotación de potrero">
                     Rotación de potrero
                   </option>
-
                   <option value="Disponibilidad de pasto">
                     Disponibilidad de pasto
                   </option>
-
                   <option value="Manejo sanitario">
                     Manejo sanitario
                   </option>
-
                   <option value="Ingreso a feedlot">
                     Ingreso a feedlot
                   </option>
-
                   <option value="Salida de feedlot">
                     Salida de feedlot
                   </option>
-
                   <option value="Manejo general">
                     Manejo general
                   </option>
-
-                  <option value="Otro">
-                    Otro
-                  </option>
+                  <option value="Otro">Otro</option>
                 </select>
               </div>
             </div>
-
-            <div style={{ marginTop: "18px" }}>
-              <label style={estilos.label}>
-                Observaciones
-              </label>
+                        <div style={estilos.observaciones}>
+              <label style={estilos.label}>Observaciones</label>
 
               <textarea
                 value={form.observaciones}
                 onChange={(e) =>
                   setForm({
                     ...form,
-                    observaciones:
-                      e.target.value,
+                    observaciones: e.target.value,
                   })
                 }
-                placeholder="Información adicional del traslado..."
-                style={{
-                  ...estilos.input,
-                  minHeight: "90px",
-                  resize: "vertical",
-                }}
+                placeholder="Información adicional del movimiento..."
+                style={estilos.textarea}
               />
             </div>
 
-            <div style={estilos.formBotones}>
+            <div
+              style={{
+                ...estilos.acciones,
+                ...(esMovil ? estilos.accionesMovil : {}),
+              }}
+            >
               <button
                 type="button"
-                style={
-                  estilos.botonSecundario
-                }
-                onClick={() =>
-                  setMostrarFormulario(false)
-                }
+                style={{
+                  ...estilos.botonSecundario,
+                  ...(esMovil ? estilos.botonAccionMovil : {}),
+                }}
+                onClick={() => {
+                  setMostrarFormulario(false);
+                  setMensaje("");
+                }}
               >
                 Cancelar
               </button>
@@ -666,9 +601,8 @@ export default function MovimientosPage() {
                 disabled={guardando}
                 style={{
                   ...estilos.botonPrincipal,
-                  opacity: guardando
-                    ? 0.7
-                    : 1,
+                  ...(esMovil ? estilos.botonAccionMovil : {}),
+                  opacity: guardando ? 0.65 : 1,
                 }}
               >
                 {guardando
@@ -679,152 +613,165 @@ export default function MovimientosPage() {
           </form>
         )}
 
-        <div style={estilos.tablaPanel}>
-          <div style={estilos.tablaHeader}>
-            <h2 style={estilos.tablaTitulo}>
-              Historial de movimientos
-            </h2>
+        <section style={estilos.panel}>
+          <div
+            style={{
+              ...estilos.panelHeader,
+              ...(esMovil ? estilos.panelHeaderMovil : {}),
+            }}
+          >
+            <div>
+              <h2 style={estilos.panelTitulo}>
+                Historial de movimientos
+              </h2>
 
-            <span
-              style={estilos.tablaSubtitulo}
-            >
-              {movimientos.length} registro
-              {movimientos.length === 1
-                ? ""
-                : "s"}
-            </span>
+              <p style={estilos.panelSubtitulo}>
+                {movimientos.length}{" "}
+                {movimientos.length === 1
+                  ? "registro"
+                  : "registros"}
+              </p>
+            </div>
           </div>
 
           {movimientos.length === 0 ? (
             <div style={estilos.vacio}>
-              <div
-                style={{ fontSize: "38px" }}
-              >
-                ↔
-              </div>
+              No hay movimientos registrados.
+            </div>
+          ) : esMovil ? (
+            <div style={estilos.listaMovil}>
+              {movimientos.map((movimiento) => (
+                <article
+                  key={movimiento.id}
+                  style={estilos.movimientoCard}
+                >
+                  <div style={estilos.movimientoTop}>
+                    <div>
+                      <span style={estilos.etiquetaCard}>
+                        MOVIMIENTO
+                      </span>
 
-              <strong>
-                No hay movimientos registrados
-              </strong>
+                      <h3 style={estilos.nombreLoteCard}>
+                        {movimiento.gan_lotes_ganado?.nombre ||
+                          "Lote"}
+                      </h3>
 
-              <span>
-                Registra el primer traslado de
-                ganado entre potreros.
-              </span>
+                      <span style={estilos.fechaCard}>
+                        {formatearFecha(movimiento.fecha)}
+                      </span>
+                    </div>
+
+                    <div style={estilos.badgeAnimales}>
+                      {movimiento.cantidad_animales} animales
+                    </div>
+                  </div>
+
+                  <div style={estilos.rutaCard}>
+                    <div style={estilos.potreroCard}>
+                      <span style={estilos.datoLabel}>
+                        Origen
+                      </span>
+                      <strong style={estilos.datoValor}>
+                        {nombrePotrero(
+                          movimiento.potrero_origen_id
+                        )}
+                      </strong>
+                    </div>
+
+                    <div style={estilos.flechaCard}>→</div>
+
+                    <div style={estilos.potreroCard}>
+                      <span style={estilos.datoLabel}>
+                        Destino
+                      </span>
+                      <strong style={estilos.datoValor}>
+                        {nombrePotrero(
+                          movimiento.potrero_destino_id
+                        )}
+                      </strong>
+                    </div>
+                  </div>
+
+                  <div style={estilos.detallesCard}>
+                    <div>
+                      <span style={estilos.datoLabel}>
+                        Motivo
+                      </span>
+                      <strong style={estilos.datoValor}>
+                        {movimiento.motivo || "Sin motivo"}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span style={estilos.datoLabel}>
+                        Observaciones
+                      </span>
+                      <strong style={estilos.datoValor}>
+                        {movimiento.observaciones ||
+                          "Sin observaciones"}
+                      </strong>
+                    </div>
+                  </div>
+                </article>
+              ))}
             </div>
           ) : (
-            <div
-              style={{ overflowX: "auto" }}
-            >
+            <div style={estilos.tablaContenedor}>
               <table style={estilos.tabla}>
                 <thead>
                   <tr>
-                    <th style={estilos.th}>
-                      Fecha
-                    </th>
-
-                    <th style={estilos.th}>
-                      Lote
-                    </th>
-
-                    <th style={estilos.th}>
-                      Animales
-                    </th>
-
-                    <th style={estilos.th}>
-                      Origen
-                    </th>
-
-                    <th style={estilos.th}>
-                      Destino
-                    </th>
-
-                    <th style={estilos.th}>
-                      Motivo
-                    </th>
-
-                    <th style={estilos.th}>
-                      Observaciones
-                    </th>
+                    <th style={estilos.th}>Fecha</th>
+                    <th style={estilos.th}>Lote</th>
+                    <th style={estilos.th}>Origen</th>
+                    <th style={estilos.th}>Destino</th>
+                    <th style={estilos.th}>Cantidad</th>
+                    <th style={estilos.th}>Motivo</th>
+                    <th style={estilos.th}>Observaciones</th>
                   </tr>
                 </thead>
 
                 <tbody>
-                  {movimientos.map(
-                    (movimiento) => (
-                      <tr
-                        key={movimiento.id}
-                      >
-                        <td
-                          style={estilos.td}
-                        >
-                          {formatearFecha(
-                            movimiento.fecha
-                          )}
-                        </td>
+                  {movimientos.map((movimiento) => (
+                    <tr key={movimiento.id}>
+                      <td style={estilos.td}>
+                        {formatearFecha(movimiento.fecha)}
+                      </td>
 
-                        <td
-                          style={estilos.td}
-                        >
-                          <strong>
-                            {movimiento
-                              .gan_lotes_ganado
-                              ?.nombre || "—"}
-                          </strong>
-                        </td>
+                      <td style={estilos.tdFuerte}>
+                        {movimiento.gan_lotes_ganado?.nombre ||
+                          "Lote"}
+                      </td>
 
-                        <td
-                          style={estilos.td}
-                        >
-                          {
-                            movimiento.cantidad_animales
-                          }
-                        </td>
+                      <td style={estilos.td}>
+                        {nombrePotrero(
+                          movimiento.potrero_origen_id
+                        )}
+                      </td>
 
-                        <td
-                          style={estilos.td}
-                        >
-                          {nombrePotrero(
-                            movimiento.potrero_origen_id
-                          )}
-                        </td>
+                      <td style={estilos.td}>
+                        {nombrePotrero(
+                          movimiento.potrero_destino_id
+                        )}
+                      </td>
 
-                        <td
-                          style={estilos.td}
-                        >
-                          <strong
-                            style={{
-                              color:
-                                "#176b3a",
-                            }}
-                          >
-                            {nombrePotrero(
-                              movimiento.potrero_destino_id
-                            )}
-                          </strong>
-                        </td>
+                      <td style={estilos.td}>
+                        {movimiento.cantidad_animales}
+                      </td>
 
-                        <td
-                          style={estilos.td}
-                        >
-                          {movimiento.motivo ||
-                            "—"}
-                        </td>
+                      <td style={estilos.td}>
+                        {movimiento.motivo || "—"}
+                      </td>
 
-                        <td
-                          style={estilos.td}
-                        >
-                          {movimiento.observaciones ||
-                            "—"}
-                        </td>
-                      </tr>
-                    )
-                  )}
+                      <td style={estilos.td}>
+                        {movimiento.observaciones || "—"}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
           )}
-        </div>
+        </section>
       </section>
     </main>
   );
@@ -841,36 +788,17 @@ function Tarjeta({
 }) {
   return (
     <div style={estilos.tarjeta}>
-      <span
-        style={estilos.tarjetaTitulo}
-      >
-        {titulo}
-      </span>
-
-      <strong
-        style={estilos.tarjetaValor}
-      >
-        {valor}
-      </strong>
-
-      <span
-        style={estilos.tarjetaDetalle}
-      >
-        {detalle}
-      </span>
+      <span style={estilos.tarjetaTitulo}>{titulo}</span>
+      <strong style={estilos.tarjetaValor}>{valor}</strong>
+      <span style={estilos.tarjetaDetalle}>{detalle}</span>
     </div>
   );
 }
 
-const estilos: Record<
-  string,
-  React.CSSProperties
-> = {
+const estilos: Record<string, React.CSSProperties> = {
   pagina: {
     minHeight: "100vh",
-    background: "#f4f7f3",
-    fontFamily: "Arial, sans-serif",
-    color: "#20352a",
+    background: "#f5f8f5",
   },
 
   cargando: {
@@ -878,211 +806,430 @@ const estilos: Record<
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    background: "#f4f7f3",
-    fontFamily: "Arial, sans-serif",
+    background: "#f5f8f5",
     color: "#176b3a",
     fontWeight: 700,
+    fontFamily: "Arial, sans-serif",
   },
 
   contenido: {
     marginLeft: "235px",
+    minHeight: "100vh",
     padding: "32px",
+    boxSizing: "border-box",
+    color: "#173d29",
+    fontFamily: "Arial, sans-serif",
+  },
+
+  contenidoMovil: {
+    marginLeft: 0,
+    width: "100%",
+    maxWidth: "100vw",
+    padding: "84px 14px 28px",
+    overflowX: "hidden",
   },
 
   header: {
     display: "flex",
+    alignItems: "flex-start",
     justifyContent: "space-between",
-    alignItems: "center",
     gap: "20px",
-    marginBottom: "25px",
+    marginBottom: "24px",
+  },
+
+  headerMovil: {
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: "14px",
+    marginBottom: "18px",
   },
 
   titulo: {
     margin: 0,
-    fontSize: "28px",
-    color: "#143e28",
+    fontSize: "38px",
+    lineHeight: 1.1,
+    color: "#174c2e",
+    fontWeight: 800,
+  },
+
+  tituloMovil: {
+    fontSize: "25px",
   },
 
   subtitulo: {
-    margin: "7px 0 0",
-    color: "#718078",
-    fontSize: "14px",
+    margin: "9px 0 0",
+    color: "#74867a",
+    fontSize: "17px",
+  },
+
+  subtituloMovil: {
+    marginTop: "6px",
+    fontSize: "13px",
+    lineHeight: 1.4,
   },
 
   botonPrincipal: {
-    background: "#176b3a",
     border: "none",
     borderRadius: "10px",
-    color: "white",
-    padding: "12px 18px",
+    background: "#18763e",
+    color: "#ffffff",
+    padding: "13px 20px",
+    minHeight: "46px",
     fontSize: "14px",
     fontWeight: 700,
     cursor: "pointer",
+    boxSizing: "border-box",
   },
 
-  botonSecundario: {
-    background: "white",
-    border: "1px solid #d7dfd9",
-    borderRadius: "10px",
-    color: "#53675b",
-    padding: "12px 18px",
-    fontSize: "14px",
-    fontWeight: 600,
-    cursor: "pointer",
+  botonPrincipalMovil: {
+    width: "100%",
   },
 
   mensaje: {
-    padding: "12px 15px",
     borderRadius: "10px",
-    marginBottom: "20px",
+    padding: "12px 14px",
+    marginBottom: "18px",
     fontSize: "13px",
+    fontWeight: 600,
   },
 
   resumenGrid: {
     display: "grid",
-    gridTemplateColumns:
-      "repeat(3, minmax(0, 1fr))",
-    gap: "18px",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    gap: "16px",
     marginBottom: "22px",
+  },
+
+  resumenGridMovil: {
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    gap: "8px",
+    marginBottom: "16px",
   },
 
   tarjeta: {
-    background: "white",
-    border: "1px solid #e0e8e2",
+    background: "#ffffff",
+    border: "1px solid #dce6df",
     borderRadius: "14px",
-    padding: "19px",
-    display: "flex",
-    flexDirection: "column",
-    gap: "7px",
+    padding: "20px",
+    minWidth: 0,
+    boxSizing: "border-box",
+    boxShadow: "0 1px 2px rgba(20, 70, 40, 0.03)",
   },
 
   tarjetaTitulo: {
-    color: "#718078",
+    display: "block",
+    color: "#66786c",
     fontSize: "13px",
-    fontWeight: 600,
+    fontWeight: 700,
+    marginBottom: "8px",
   },
 
   tarjetaValor: {
-    color: "#176b3a",
-    fontSize: "27px",
+    display: "block",
+    color: "#16733b",
+    fontSize: "34px",
+    lineHeight: 1.05,
+    marginBottom: "8px",
   },
 
   tarjetaDetalle: {
-    color: "#98a39c",
+    display: "block",
+    color: "#95a299",
     fontSize: "12px",
+    lineHeight: 1.35,
   },
 
   formulario: {
-    background: "white",
-    border: "1px solid #e0e8e2",
-    borderRadius: "15px",
+    background: "#ffffff",
+    border: "1px solid #dce6df",
+    borderRadius: "14px",
     padding: "24px",
     marginBottom: "22px",
+    boxSizing: "border-box",
+  },
+
+  formularioMovil: {
+    padding: "16px",
+    borderRadius: "12px",
+    marginBottom: "16px",
   },
 
   formTitulo: {
-    margin: "0 0 14px",
-    color: "#244b34",
-    fontSize: "18px",
+    margin: "0 0 18px",
+    color: "#174c2e",
+    fontSize: "22px",
+    fontWeight: 800,
   },
 
   aviso: {
-    background: "#f4f8f5",
-    border: "1px solid #dce8df",
-    borderRadius: "9px",
-    padding: "11px 13px",
-    marginBottom: "20px",
-    color: "#63766a",
+    background: "#eef7f0",
+    border: "1px solid #d6eadc",
+    borderRadius: "10px",
+    color: "#466452",
+    padding: "12px 14px",
+    marginBottom: "18px",
     fontSize: "12px",
+    lineHeight: 1.45,
   },
 
   formGrid: {
     display: "grid",
-    gridTemplateColumns:
-      "repeat(3, minmax(0, 1fr))",
-    gap: "17px",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    gap: "18px",
+  },
+
+  formGridMovil: {
+    gridTemplateColumns: "1fr",
+    gap: "14px",
   },
 
   label: {
     display: "block",
-    marginBottom: "7px",
-    color: "#43594b",
+    color: "#405a49",
     fontSize: "13px",
-    fontWeight: 600,
+    fontWeight: 700,
+    marginBottom: "7px",
   },
 
   input: {
     width: "100%",
-    boxSizing: "border-box",
-    border: "1px solid #d7dfd9",
+    minHeight: "46px",
+    border: "1px solid #cfddd3",
     borderRadius: "9px",
-    padding: "11px 12px",
-    fontSize: "14px",
+    background: "#ffffff",
+    color: "#213c2b",
+    padding: "10px 12px",
+    fontSize: "16px",
+    boxSizing: "border-box",
     outline: "none",
-    background: "white",
   },
 
-  formBotones: {
+  observaciones: {
+    marginTop: "18px",
+  },
+
+  textarea: {
+    width: "100%",
+    minHeight: "105px",
+    resize: "vertical",
+    border: "1px solid #cfddd3",
+    borderRadius: "9px",
+    background: "#ffffff",
+    color: "#213c2b",
+    padding: "12px",
+    fontSize: "16px",
+    lineHeight: 1.45,
+    boxSizing: "border-box",
+    outline: "none",
+  },
+
+  acciones: {
     display: "flex",
     justifyContent: "flex-end",
     gap: "10px",
-    marginTop: "22px",
+    marginTop: "20px",
   },
 
-  tablaPanel: {
-    background: "white",
-    border: "1px solid #e0e8e2",
-    borderRadius: "15px",
+  accionesMovil: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "9px",
+  },
+
+  botonAccionMovil: {
+    width: "100%",
+    paddingLeft: "7px",
+    paddingRight: "7px",
+  },
+
+  botonSecundario: {
+    border: "1px solid #cfddd3",
+    borderRadius: "10px",
+    background: "#ffffff",
+    color: "#506659",
+    padding: "13px 20px",
+    minHeight: "46px",
+    fontSize: "14px",
+    fontWeight: 700,
+    cursor: "pointer",
+    boxSizing: "border-box",
+  },
+
+  panel: {
+    background: "#ffffff",
+    border: "1px solid #dce6df",
+    borderRadius: "14px",
     overflow: "hidden",
   },
 
-  tablaHeader: {
-    padding: "20px 22px",
-    borderBottom: "1px solid #edf1ee",
+  panelHeader: {
+    padding: "22px 24px",
+    borderBottom: "1px solid #e5ece7",
   },
 
-  tablaTitulo: {
+  panelHeaderMovil: {
+    padding: "16px",
+  },
+
+  panelTitulo: {
     margin: 0,
-    fontSize: "17px",
-    color: "#244b34",
+    color: "#174c2e",
+    fontSize: "22px",
+    fontWeight: 800,
   },
 
-  tablaSubtitulo: {
-    display: "block",
-    marginTop: "5px",
-    color: "#94a198",
-    fontSize: "12px",
+  panelSubtitulo: {
+    margin: "7px 0 0",
+    color: "#92a097",
+    fontSize: "13px",
+  },
+
+  vacio: {
+    padding: "30px 24px",
+    color: "#849188",
+    textAlign: "center",
+    fontSize: "13px",
+  },
+
+  tablaContenedor: {
+    width: "100%",
+    overflowX: "auto",
   },
 
   tabla: {
     width: "100%",
     borderCollapse: "collapse",
-    fontSize: "13px",
+    minWidth: "900px",
   },
 
   th: {
     textAlign: "left",
-    padding: "13px 16px",
-    background: "#f7faf7",
-    color: "#66776c",
+    padding: "14px 16px",
+    background: "#f6f9f7",
+    color: "#627469",
+    fontSize: "12px",
     fontWeight: 700,
-    borderBottom: "1px solid #edf1ee",
+    borderBottom: "1px solid #e3ebe5",
+    whiteSpace: "nowrap",
   },
 
   td: {
-    padding: "14px 16px",
+    padding: "16px",
+    color: "#405649",
+    fontSize: "13px",
     borderBottom: "1px solid #edf1ee",
-    color: "#45594c",
+    verticalAlign: "top",
   },
 
-  vacio: {
-    minHeight: "250px",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "9px",
-    color: "#829087",
+  tdFuerte: {
+    padding: "16px",
+    color: "#314b3b",
     fontSize: "13px",
+    fontWeight: 700,
+    borderBottom: "1px solid #edf1ee",
+    verticalAlign: "top",
+  },
+
+  listaMovil: {
+    padding: "12px",
+  },
+
+  movimientoCard: {
+    background: "#ffffff",
+    border: "1px solid #dce6df",
+    borderRadius: "12px",
+    padding: "14px",
+    marginBottom: "10px",
+    boxSizing: "border-box",
+  },
+
+  movimientoTop: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: "10px",
+    paddingBottom: "13px",
+    borderBottom: "1px solid #edf1ee",
+  },
+
+  etiquetaCard: {
+    display: "block",
+    color: "#94a198",
+    fontSize: "9px",
+    fontWeight: 800,
+    letterSpacing: "1px",
+    marginBottom: "4px",
+  },
+
+  nombreLoteCard: {
+    margin: 0,
+    color: "#174c2e",
+    fontSize: "18px",
+    fontWeight: 800,
+  },
+
+  fechaCard: {
+    display: "block",
+    marginTop: "5px",
+    color: "#89978e",
+    fontSize: "11px",
+  },
+
+  badgeAnimales: {
+    display: "inline-block",
+    background: "#eaf6ee",
+    color: "#176b3a",
+    borderRadius: "20px",
+    padding: "6px 10px",
+    fontSize: "10px",
+    fontWeight: 700,
+    whiteSpace: "nowrap",
+  },
+
+  rutaCard: {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) auto minmax(0, 1fr)",
+    gap: "8px",
+    alignItems: "center",
+    marginTop: "14px",
+  },
+
+  potreroCard: {
+    background: "#f6faf7",
+    borderRadius: "9px",
+    padding: "12px",
+    minWidth: 0,
+  },
+
+  flechaCard: {
+    color: "#178044",
+    fontSize: "22px",
+    fontWeight: 800,
+    textAlign: "center",
+  },
+
+  datoLabel: {
+    display: "block",
+    color: "#8a9890",
+    fontSize: "10px",
+    marginBottom: "5px",
+  },
+
+  datoValor: {
+    display: "block",
+    color: "#35483b",
+    fontSize: "12px",
+    lineHeight: 1.4,
+    fontWeight: 700,
+    overflowWrap: "anywhere",
+  },
+
+  detallesCard: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "12px",
+    marginTop: "14px",
+    paddingTop: "14px",
+    borderTop: "1px solid #edf1ee",
   },
 };
