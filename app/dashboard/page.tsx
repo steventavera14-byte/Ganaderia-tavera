@@ -472,78 +472,22 @@ export default function DashboardPage() {
             : {}),
         }}
       >
-        {/* HERO */}
+        {/* HERO GANADERÍA TAVERA */}
 
         <section
           style={{
-            ...estilos.hero,
-            ...(esMovil ? estilos.heroMovil : {}),
+            ...estilos.heroImagen,
+            ...(esMovil ? estilos.heroImagenMovil : {}),
           }}
         >
-          <div style={estilos.heroDecoracionUno} />
-          <div style={estilos.heroDecoracionDos} />
-
-          <div style={estilos.heroContenido}>
-            <div>
-              <div style={estilos.heroEtiqueta}>
-                GANADERÍA TAVERA
-              </div>
-
-              <h1
-                style={{
-                  ...estilos.heroTitulo,
-                  ...(esMovil
-                    ? estilos.heroTituloMovil
-                    : {}),
-                }}
-              >
-                Hola, {nombreUsuario}
-              </h1>
-
-              <p style={estilos.heroSubtitulo}>
-                Este es el estado actual de tu
-                operación ganadera.
-              </p>
-            </div>
-
-            <div style={estilos.estadoOperacion}>
-              <span style={estilos.puntoActivo} />
-              Operación activa
-            </div>
-          </div>
-
-          <div style={estilos.heroResumen}>
-            <div>
-              <span style={estilos.heroResumenLabel}>
-                Ganado
-              </span>
-              <strong style={estilos.heroResumenValor}>
-                {ganadoTotal}
-              </strong>
-            </div>
-
-            <div style={estilos.heroSeparador} />
-
-            <div>
-              <span style={estilos.heroResumenLabel}>
-                Lotes
-              </span>
-              <strong style={estilos.heroResumenValor}>
-                {lotesActivos}
-              </strong>
-            </div>
-
-            <div style={estilos.heroSeparador} />
-
-            <div>
-              <span style={estilos.heroResumenLabel}>
-                Superficie
-              </span>
-              <strong style={estilos.heroResumenValor}>
-                {superficieTotal} ha
-              </strong>
-            </div>
-          </div>
+          <img
+            src="/ganaderia-tavera-banner.png"
+            alt="Ganadería Tavera"
+            style={{
+              ...estilos.heroBanner,
+              ...(esMovil ? estilos.heroBannerMovil : {}),
+            }}
+          />
         </section>
 
         {/* TARJETAS PRINCIPALES */}
@@ -1149,6 +1093,34 @@ const estilos: Record<
     marginLeft: 0,
     padding: "84px 14px 24px",
     width: "100%",
+  },
+
+  heroImagen: {
+    width: "100%",
+    height: "310px",
+    borderRadius: "22px",
+    overflow: "hidden",
+    marginBottom: "20px",
+    background: "#dfe8df",
+    boxShadow: "0 12px 35px rgba(20,79,45,0.13)",
+  },
+
+  heroImagenMovil: {
+    height: "190px",
+    borderRadius: "18px",
+  },
+
+  heroBanner: {
+    display: "block",
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    objectPosition: "center",
+  },
+
+  heroBannerMovil: {
+    objectFit: "cover",
+    objectPosition: "center",
   },
 
   hero: {
