@@ -64,6 +64,17 @@ type Mantenimiento = {
   created_at: string;
 };
 
+type ServicioProgramado = {
+  id: string;
+  maquinaria_id: string;
+  descripcion: string;
+  proxima_fecha: string | null;
+  proxima_lectura: number | null;
+  completado: boolean;
+  observaciones: string | null;
+  created_at: string;
+};
+
 export default function FichaMaquinariaPage() {
   const router = useRouter();
   const params = useParams();
@@ -80,6 +91,7 @@ export default function FichaMaquinariaPage() {
   const [lecturas, setLecturas] = useState<Lectura[]>([]);
   const [combustibles, setCombustibles] = useState<Combustible[]>([]);
   const [mantenimientos, setMantenimientos] = useState<Mantenimiento[]>([]);
+  const [serviciosProgramados, setServiciosProgramados] = useState<ServicioProgramado[]>([]);
 
   const [mostrarLecturas, setMostrarLecturas] = useState(false);
   const [mostrarFormularioLectura, setMostrarFormularioLectura] =
@@ -93,9 +105,15 @@ export default function FichaMaquinariaPage() {
   const [mostrarFormularioMantenimiento, setMostrarFormularioMantenimiento] =
     useState(false);
 
+  const [mostrarServiciosProgramados, setMostrarServiciosProgramados] =
+    useState(false);
+  const [mostrarFormularioServicioProgramado, setMostrarFormularioServicioProgramado] =
+    useState(false);
+
   const [guardandoLectura, setGuardandoLectura] = useState(false);
   const [guardandoCombustible, setGuardandoCombustible] = useState(false);
   const [guardandoMantenimiento, setGuardandoMantenimiento] = useState(false);
+  const [guardandoServicioProgramado, setGuardandoServicioProgramado] = useState(false);
 
   const [fechaLectura, setFechaLectura] = useState(
     new Date().toISOString().split("T")[0]
@@ -124,6 +142,11 @@ export default function FichaMaquinariaPage() {
   const [costoOtros, setCostoOtros] = useState("");
   const [proveedorMantenimiento, setProveedorMantenimiento] = useState("");
   const [observacionMantenimiento, setObservacionMantenimiento] = useState("");
+
+  const [descripcionServicioProgramado, setDescripcionServicioProgramado] = useState("");
+  const [fechaServicioProgramado, setFechaServicioProgramado] = useState("");
+  const [lecturaServicioProgramado, setLecturaServicioProgramado] = useState("");
+  const [observacionServicioProgramado, setObservacionServicioProgramado] = useState("");
 
   useEffect(() => {
     if (maquinaId) {
@@ -169,6 +192,7 @@ export default function FichaMaquinariaPage() {
       await cargarLecturas();
       await cargarCombustibles();
       await cargarMantenimientos();
+      await cargarServiciosProgramados();
     } catch (err: any) {
       console.error(err);
       setError(
@@ -254,6 +278,23 @@ export default function FichaMaquinariaPage() {
     if (errorMantenimientos) throw errorMantenimientos;
 
     setMantenimientos((data || []) as Mantenimiento[]);
+  }
+
+  async function cargarServiciosProgramados() {
+    if (!maquinaId) return;
+
+    const { data, error: errorServicios } = await supabase
+      .from("gan_mantenimiento_programado")
+      .select("*")
+      .eq("maquinaria_id", maquinaId)
+      .order("completado", { ascending: true })
+      .order("proxima_fecha", { ascending: true, nullsFirst: false })
+      .order("proxima_lectura", { ascending: true, nullsFirst: false })
+      .order("created_at", { ascending: false });
+
+    if (errorServicios) throw errorServicios;
+
+    setServiciosProgramados((data || []) as ServicioProgramado[]);
   }
 
   function abrirLecturas() {
@@ -621,6 +662,114 @@ export default function FichaMaquinariaPage() {
       reparacion: "Reparación",
     };
     return etiquetas[tipo] || tipo;
+  }
+
+  function abrirServiciosProgramados() {
+    setMostrarServiciosProgramados(true);
+    setMostrarFormularioServicioProgramado(false);
+    setMensaje("");
+    setError("");
+  }
+
+  function cerrarServiciosProgramados() {
+    setMostrarServiciosProgramados(false);
+    setMostrarFormularioServicioProgramado(false);
+    setMensaje("");
+    setError("");
+  }
+
+  function abrirNuevoServicioProgramado() {
+    setDescripcionServicioProgramado("");
+    setFechaServicioProgramado("");
+    setLecturaServicioProgramado("");
+    setObservacionServicioProgramado("");
+    setError("");
+    setMensaje("");
+    setMostrarFormularioServicioProgramado(true);
+  }
+
+  async function programarServicio(e: React.FormEvent) {
+    e.preventDefault();
+    if (!maquina || !maquinaId) return;
+
+    const lectura =
+      lecturaServicioProgramado.trim() === ""
+        ? null
+        : Number(lecturaServicioProgramado);
+
+    if (!descripcionServicioProgramado.trim()) {
+      setError("Ingresa la descripción del próximo servicio.");
+      return;
+    }
+
+    if (!fechaServicioProgramado && lectura === null) {
+      setError("Indica una fecha o una próxima lectura.");
+      return;
+    }
+
+    if (lectura !== null && (Number.isNaN(lectura) || lectura < 0)) {
+      setError("Ingresa una próxima lectura válida.");
+      return;
+    }
+
+    if (
+      maquina.tipo_medicion !== "ninguno" &&
+      lectura !== null &&
+      lectura <= Number(maquina.lectura_actual || 0)
+    ) {
+      setError(
+        `La próxima lectura debe ser mayor que ${Number(
+          maquina.lectura_actual || 0
+        ).toLocaleString("es-BO")} ${unidadLectura()}.`
+      );
+      return;
+    }
+
+    try {
+      setGuardandoServicioProgramado(true);
+      setError("");
+      setMensaje("");
+
+      const { error: errorRpc } = await supabase.rpc(
+        "gan_programar_mantenimiento",
+        {
+          p_maquinaria_id: maquinaId,
+          p_descripcion: descripcionServicioProgramado.trim(),
+          p_proxima_fecha: fechaServicioProgramado || null,
+          p_proxima_lectura: lectura,
+          p_observaciones: observacionServicioProgramado.trim() || null,
+        }
+      );
+
+      if (errorRpc) throw errorRpc;
+
+      await cargarServiciosProgramados();
+      setMostrarFormularioServicioProgramado(false);
+      setMensaje("Próximo servicio programado correctamente.");
+    } catch (err: any) {
+      console.error(err);
+      setError(err?.message || "No se pudo programar el servicio.");
+    } finally {
+      setGuardandoServicioProgramado(false);
+    }
+  }
+
+  function serviciosPendientes() {
+    return serviciosProgramados.filter((item) => !item.completado);
+  }
+
+  function estadoServicio(item: ServicioProgramado) {
+    if (item.completado) return "Completado";
+
+    const hoy = new Date().toISOString().split("T")[0];
+    const vencidoFecha = !!item.proxima_fecha && item.proxima_fecha <= hoy;
+    const vencidoLectura =
+      item.proxima_lectura !== null &&
+      item.proxima_lectura !== undefined &&
+      maquina !== null &&
+      Number(maquina.lectura_actual || 0) >= Number(item.proxima_lectura);
+
+    return vencidoFecha || vencidoLectura ? "Vencido / por realizar" : "Pendiente";
   }
 
   function etiquetaEstado(estado: Maquinaria["estado"]) {
@@ -1528,6 +1677,214 @@ export default function FichaMaquinariaPage() {
               </section>
             )}
 
+            {mostrarServiciosProgramados && (
+              <section className="panel panel-servicios">
+                <div className="titulo-panel">
+                  <div>
+                    <div className="eyebrow">MANTENIMIENTO PROGRAMADO</div>
+                    <h2>Próximos servicios</h2>
+                    <p>Programa mantenimientos por fecha, horómetro o kilometraje.</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="boton-cerrar"
+                    onClick={cerrarServiciosProgramados}
+                  >
+                    ×
+                  </button>
+                </div>
+
+                <div className="servicios-resumen">
+                  <div>
+                    <span>Pendientes</span>
+                    <strong>{serviciosPendientes().length}</strong>
+                  </div>
+                  <div>
+                    <span>Programados</span>
+                    <strong>{serviciosProgramados.length}</strong>
+                  </div>
+                  <div>
+                    <span>Lectura actual</span>
+                    <strong>{valorLectura()}</strong>
+                  </div>
+                  <button
+                    type="button"
+                    className="boton-principal"
+                    onClick={abrirNuevoServicioProgramado}
+                  >
+                    + Programar servicio
+                  </button>
+                </div>
+
+                {mostrarFormularioServicioProgramado && (
+                  <form
+                    className="form-servicio"
+                    onSubmit={programarServicio}
+                  >
+                    <div className="form-servicio-grid">
+                      <label className="campo-completo">
+                        <span>Descripción *</span>
+                        <input
+                          type="text"
+                          value={descripcionServicioProgramado}
+                          onChange={(e) =>
+                            setDescripcionServicioProgramado(e.target.value)
+                          }
+                          placeholder="Ej. Cambio de aceite y filtros"
+                          required
+                        />
+                      </label>
+
+                      <label>
+                        <span>Próxima fecha</span>
+                        <input
+                          type="date"
+                          value={fechaServicioProgramado}
+                          onChange={(e) =>
+                            setFechaServicioProgramado(e.target.value)
+                          }
+                        />
+                      </label>
+
+                      {maquina.tipo_medicion !== "ninguno" && (
+                        <label>
+                          <span>
+                            {maquina.tipo_medicion === "horas"
+                              ? "Próximo horómetro"
+                              : "Próximo kilometraje"}
+                          </span>
+                          <div className="input-unidad">
+                            <input
+                              type="number"
+                              min={Number(maquina.lectura_actual || 0) + 0.01}
+                              step="0.01"
+                              inputMode="decimal"
+                              value={lecturaServicioProgramado}
+                              onChange={(e) =>
+                                setLecturaServicioProgramado(e.target.value)
+                              }
+                              placeholder={`Mayor a ${Number(
+                                maquina.lectura_actual || 0
+                              ).toLocaleString("es-BO")}`}
+                            />
+                            <span>{unidadLectura()}</span>
+                          </div>
+                        </label>
+                      )}
+
+                      <label className="campo-completo">
+                        <span>Observaciones</span>
+                        <textarea
+                          value={observacionServicioProgramado}
+                          onChange={(e) =>
+                            setObservacionServicioProgramado(e.target.value)
+                          }
+                          rows={3}
+                          placeholder="Ej. Revisar también filtros y niveles."
+                        />
+                      </label>
+                    </div>
+
+                    <div className="nota-programacion">
+                      Debes indicar al menos una fecha o una próxima lectura.
+                    </div>
+
+                    <div className="acciones-form">
+                      <button
+                        type="button"
+                        className="boton-secundario"
+                        onClick={() =>
+                          setMostrarFormularioServicioProgramado(false)
+                        }
+                        disabled={guardandoServicioProgramado}
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="submit"
+                        className="boton-principal"
+                        disabled={guardandoServicioProgramado}
+                      >
+                        {guardandoServicioProgramado
+                          ? "Guardando..."
+                          : "Guardar programación"}
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                <div className="historial-cabecera">
+                  <h3>Servicios programados</h3>
+                  <span>
+                    {serviciosProgramados.length}{" "}
+                    {serviciosProgramados.length === 1
+                      ? "registro"
+                      : "registros"}
+                  </span>
+                </div>
+
+                {serviciosProgramados.length === 0 ? (
+                  <div className="sin-lecturas">
+                    <div>📅</div>
+                    <strong>No hay servicios programados todavía</strong>
+                    <p>
+                      Programa el próximo mantenimiento por fecha o lectura.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="tabla-contenedor">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Servicio</th>
+                          <th>Fecha</th>
+                          <th>Lectura</th>
+                          <th>Estado</th>
+                          <th>Observación</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {serviciosProgramados.map((item) => (
+                          <tr key={item.id}>
+                            <td data-label="Servicio">
+                              <strong>{item.descripcion}</strong>
+                            </td>
+                            <td data-label="Fecha">
+                              {formatearFecha(item.proxima_fecha)}
+                            </td>
+                            <td data-label="Lectura">
+                              {item.proxima_lectura === null ||
+                              item.proxima_lectura === undefined
+                                ? "—"
+                                : `${Number(
+                                    item.proxima_lectura
+                                  ).toLocaleString("es-BO")} ${unidadLectura()}`}
+                            </td>
+                            <td data-label="Estado">
+                              <span
+                                className={`estado-servicio ${
+                                  estadoServicio(item) === "Pendiente"
+                                    ? "estado-servicio-pendiente"
+                                    : estadoServicio(item) === "Completado"
+                                    ? "estado-servicio-completado"
+                                    : "estado-servicio-vencido"
+                                }`}
+                              >
+                                {estadoServicio(item)}
+                              </span>
+                            </td>
+                            <td data-label="Observación">
+                              {item.observaciones || "—"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </section>
+            )}
+
             <section className="panel">
               <div className="titulo-panel">
                 <div>
@@ -1616,11 +1973,26 @@ export default function FichaMaquinariaPage() {
                   <span className="disponible">Abrir →</span>
                 </button>
 
-                <Modulo
-                  icono="📅"
-                  titulo="Próximos servicios"
-                  descripcion="Mantenimiento programado por fecha o lectura."
-                />
+                <button
+                  type="button"
+                  className="modulo modulo-activo"
+                  onClick={abrirServiciosProgramados}
+                >
+                  <div className="modulo-icono">📅</div>
+                  <div className="modulo-texto">
+                    <strong>Próximos servicios</strong>
+                    <p>
+                      {serviciosPendientes().length === 0
+                        ? "Mantenimiento programado por fecha o lectura."
+                        : `${serviciosPendientes().length} ${
+                            serviciosPendientes().length === 1
+                              ? "servicio pendiente"
+                              : "servicios pendientes"
+                          }`}
+                    </p>
+                  </div>
+                  <span className="disponible">Abrir →</span>
+                </button>
 
                 <Modulo
                   icono="🚜"
@@ -1921,6 +2293,10 @@ const estilos = `
   }
 
   .panel-mantenimiento {
+    border-top: 4px solid #2d7545;
+  }
+
+  .panel-servicios {
     border-top: 4px solid #2d7545;
   }
 
@@ -2290,6 +2666,116 @@ const estilos = `
     box-shadow: 0 0 0 3px rgba(60, 134, 86, 0.09);
   }
 
+  .servicios-resumen {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+    align-items: center;
+    gap: 12px;
+    background: #f4f8f5;
+    border: 1px solid #e0e9e2;
+    border-radius: 13px;
+    padding: 17px;
+    margin-bottom: 17px;
+  }
+
+  .servicios-resumen span {
+    display: block;
+    color: #738078;
+    font-size: 11px;
+  }
+
+  .servicios-resumen strong {
+    display: block;
+    color: #173d27;
+    font-size: 20px;
+    margin-top: 4px;
+    overflow-wrap: anywhere;
+  }
+
+  .form-servicio {
+    border: 1px solid #dce6de;
+    background: #fbfcfb;
+    border-radius: 13px;
+    padding: 17px;
+    margin-bottom: 20px;
+  }
+
+  .form-servicio-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .form-servicio label {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .form-servicio label > span {
+    color: #405046;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .form-servicio input,
+  .form-servicio textarea {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #ccd6ce;
+    border-radius: 9px;
+    background: white;
+    color: #1e2e23;
+    padding: 10px 11px;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+  }
+
+  .form-servicio input {
+    min-height: 42px;
+  }
+
+  .form-servicio textarea {
+    resize: vertical;
+  }
+
+  .form-servicio input:focus,
+  .form-servicio textarea:focus {
+    border-color: #3c8656;
+    box-shadow: 0 0 0 3px rgba(60, 134, 86, 0.09);
+  }
+
+  .nota-programacion {
+    margin-top: 12px;
+    color: #758078;
+    font-size: 11px;
+  }
+
+  .estado-servicio {
+    display: inline-block;
+    border-radius: 999px;
+    padding: 5px 8px;
+    font-size: 10px;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  .estado-servicio-pendiente {
+    background: #fff5dd;
+    color: #946813;
+  }
+
+  .estado-servicio-vencido {
+    background: #fbe9e9;
+    color: #9a3e3e;
+  }
+
+  .estado-servicio-completado {
+    background: #eaf7ee;
+    color: #24713d;
+  }
+
   .form-lectura {
     border: 1px solid #dce6de;
     background: #fbfcfb;
@@ -2601,12 +3087,14 @@ const estilos = `
     }
 
     .combustible-resumen .boton-principal,
-    .mantenimiento-resumen .boton-principal {
+    .mantenimiento-resumen .boton-principal,
+    .servicios-resumen .boton-principal {
       grid-column: 1 / -1;
       width: 100%;
     }
 
-    .mantenimiento-resumen {
+    .mantenimiento-resumen,
+    .servicios-resumen {
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }
   }
@@ -2614,17 +3102,20 @@ const estilos = `
   @media (max-width: 600px) {
     .form-lectura-grid,
     .form-combustible-grid,
-    .form-mantenimiento-grid {
+    .form-mantenimiento-grid,
+    .form-servicio-grid {
       grid-template-columns: 1fr;
     }
 
     .combustible-resumen,
-    .mantenimiento-resumen {
+    .mantenimiento-resumen,
+    .servicios-resumen {
       grid-template-columns: 1fr;
     }
 
     .combustible-resumen .boton-principal,
-    .mantenimiento-resumen .boton-principal {
+    .mantenimiento-resumen .boton-principal,
+    .servicios-resumen .boton-principal {
       grid-column: auto;
     }
 
