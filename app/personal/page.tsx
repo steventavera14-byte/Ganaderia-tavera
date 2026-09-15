@@ -1218,14 +1218,24 @@ export default function PersonalPage() {
                           </td>
 
                           <td>
-                            <button
-                              onClick={() =>
-                                abrirEditar(trabajador)
-                              }
-                              className="btn-editar"
-                            >
-                              Editar / Ficha
-                            </button>
+                            <div className="acciones-trabajador">
+                              <button
+                                onClick={() =>
+                                  router.push(`/personal/${trabajador.id}`)
+                                }
+                                className="btn-kardex"
+                              >
+                                Ver Kardex
+                              </button>
+                              <button
+                                onClick={() =>
+                                  abrirEditar(trabajador)
+                                }
+                                className="btn-editar"
+                              >
+                                Editar
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -1309,12 +1319,22 @@ export default function PersonalPage() {
                       </strong>
                     </div>
 
-                    <button
-                      onClick={() => abrirEditar(trabajador)}
-                      className="btn-editar btn-editar-mobile"
-                    >
-                      Editar / Ficha
-                    </button>
+                    <div className="acciones-trabajador acciones-trabajador-mobile">
+                      <button
+                        onClick={() =>
+                          router.push(`/personal/${trabajador.id}`)
+                        }
+                        className="btn-kardex btn-kardex-mobile"
+                      >
+                        Ver Kardex
+                      </button>
+                      <button
+                        onClick={() => abrirEditar(trabajador)}
+                        className="btn-editar btn-editar-mobile"
+                      >
+                        Editar
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1658,6 +1678,25 @@ export default function PersonalPage() {
           color: #68736c;
         }
 
+        .acciones-trabajador {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+        }
+
+        .btn-kardex {
+          border: 1px solid #176b3a;
+          background: #176b3a;
+          color: white;
+          border-radius: 7px;
+          padding: 7px 11px;
+          font-weight: 700;
+          font-size: 11px;
+          cursor: pointer;
+          font-family: inherit;
+          white-space: nowrap;
+        }
+
         .btn-editar {
           border: 1px solid #cddbd2;
           background: white;
@@ -1938,6 +1977,24 @@ export default function PersonalPage() {
 
           .personal-mobile {
             padding: 12px;
+          }
+
+          .acciones-trabajador-mobile {
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 12px;
+          }
+
+          .btn-kardex-mobile,
+          .btn-editar-mobile {
+            width: 100%;
+            min-height: 42px;
+          }
+
+          .acciones-trabajador-mobile .btn-editar-mobile {
+            margin-top: 0;
           }
 
           .trabajador-card {
