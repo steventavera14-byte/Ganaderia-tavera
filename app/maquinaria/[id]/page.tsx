@@ -139,6 +139,7 @@ export default function FichaMaquinariaPage() {
   const [guardandoCombustible, setGuardandoCombustible] = useState(false);
   const [guardandoMantenimiento, setGuardandoMantenimiento] = useState(false);
   const [guardandoServicioProgramado, setGuardandoServicioProgramado] = useState(false);
+  const [completandoServicioId, setCompletandoServicioId] = useState<string | null>(null);
   const [guardandoUso, setGuardandoUso] = useState(false);
 
   const [fechaLectura, setFechaLectura] = useState(
@@ -814,6 +815,39 @@ export default function FichaMaquinariaPage() {
       setError(err?.message || "No se pudo programar el servicio.");
     } finally {
       setGuardandoServicioProgramado(false);
+    }
+  }
+
+  async function completarServicioProgramado(servicioId: string) {
+    const confirmar = window.confirm(
+      "¿Marcar este servicio programado como completado?"
+    );
+
+    if (!confirmar) return;
+
+    try {
+      setCompletandoServicioId(servicioId);
+      setError("");
+      setMensaje("");
+
+      const { error: errorRpc } = await supabase.rpc(
+        "gan_completar_mantenimiento_programado",
+        {
+          p_servicio_id: servicioId,
+        }
+      );
+
+      if (errorRpc) throw errorRpc;
+
+      await cargarServiciosProgramados();
+      setMensaje("Servicio programado marcado como completado.");
+    } catch (err: any) {
+      console.error(err);
+      setError(
+        err?.message || "No se pudo completar el servicio programado."
+      );
+    } finally {
+      setCompletandoServicioId(null);
     }
   }
 
@@ -2110,6 +2144,7 @@ export default function FichaMaquinariaPage() {
                           <th>Lectura</th>
                           <th>Estado</th>
                           <th>Observación</th>
+                          <th>Acción</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -2155,6 +2190,24 @@ export default function FichaMaquinariaPage() {
                             </td>
                             <td data-label="Observación">
                               {item.observaciones || "—"}
+                            </td>
+                            <td data-label="Acción">
+                              {item.completado ? (
+                                <span className="accion-completada">✓ Completado</span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="boton-completar-servicio"
+                                  onClick={() =>
+                                    completarServicioProgramado(item.id)
+                                  }
+                                  disabled={completandoServicioId === item.id}
+                                >
+                                  {completandoServicioId === item.id
+                                    ? "Completando..."
+                                    : "✓ Marcar completado"}
+                                </button>
+                              )}
                             </td>
                           </tr>
                         ))}
@@ -3346,6 +3399,34 @@ const estilos = `
     border-radius: 999px;
     padding: 5px 8px;
     font-size: 10px;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  .boton-completar-servicio {
+    border: 1px solid #b9d5c0;
+    background: #edf6ef;
+    color: #1d6335;
+    border-radius: 9px;
+    padding: 8px 11px;
+    font-size: 11px;
+    font-weight: 800;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .boton-completar-servicio:hover {
+    background: #e2f0e5;
+  }
+
+  .boton-completar-servicio:disabled {
+    opacity: 0.6;
+    cursor: wait;
+  }
+
+  .accion-completada {
+    color: #2d7545;
+    font-size: 11px;
     font-weight: 800;
     white-space: nowrap;
   }
