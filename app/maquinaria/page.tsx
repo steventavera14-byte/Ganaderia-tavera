@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Sidebar from "../components/Sidebar";
 import { supabase } from "../../lib/supabase";
 
@@ -58,6 +58,7 @@ const formularioInicial: FormularioMaquinaria = {
 
 export default function MaquinariaPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
@@ -77,6 +78,18 @@ export default function MaquinariaPage() {
   useEffect(() => {
     iniciar();
   }, []);
+
+  useEffect(() => {
+    const idEditar = searchParams.get("editar");
+
+    if (!cargando && idEditar && maquinarias.length > 0) {
+      const maquina = maquinarias.find((item) => item.id === idEditar);
+
+      if (maquina) {
+        editarMaquina(maquina);
+      }
+    }
+  }, [cargando, maquinarias, searchParams]);
 
   async function iniciar() {
     try {
