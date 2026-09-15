@@ -56,6 +56,7 @@ export default function PesajesPage() {
   const [pesajeDetalle, setPesajeDetalle] = useState<Pesaje | null>(null);
   const [detalles, setDetalles] = useState<DetallePeso[]>([]);
   const [cargandoDetalle, setCargandoDetalle] = useState(false);
+  const [pesajeEditandoId, setPesajeEditandoId] = useState<string | null>(null);
 
   useEffect(() => {
     iniciar();
@@ -198,6 +199,7 @@ export default function PesajesPage() {
     setCantidadPesada("");
     setPesos([]);
     setObservaciones("");
+    setPesajeEditandoId(null);
   };
 
   const guardarPesaje = async (e: React.FormEvent) => {
@@ -233,12 +235,19 @@ export default function PesajesPage() {
 
     setGuardando(true);
 
-    const { error } = await supabase.rpc("gan_registrar_pesaje_individual", {
-      p_lote_id: loteId,
-      p_fecha: fecha,
-      p_pesos: pesos.map(Number),
-      p_observaciones: observaciones.trim() || null,
-    });
+    const { error } = pesajeEditandoId
+      ? await supabase.rpc("gan_editar_pesaje_individual", {
+          p_pesaje_id: pesajeEditandoId,
+          p_fecha: fecha,
+          p_pesos: pesos.map(Number),
+          p_observaciones: observaciones.trim() || null,
+        })
+      : await supabase.rpc("gan_registrar_pesaje_individual", {
+          p_lote_id: loteId,
+          p_fecha: fecha,
+          p_pesos: pesos.map(Number),
+          p_observaciones: observaciones.trim() || null,
+        });
 
     if (error) {
       setMensaje(`Error al guardar: ${error.message}`);
@@ -246,11 +255,83 @@ export default function PesajesPage() {
       return;
     }
 
+    const fueEdicion = Boolean(pesajeEditandoId);
     limpiarFormulario();
     setMostrarFormulario(false);
-    setMensaje("Pesaje registrado correctamente.");
+    setPesajeDetalle(null);
+    setMensaje(
+      fueEdicion
+        ? "Pesaje actualizado correctamente."
+        : "Pesaje registrado correctamente."
+    );
     await cargarPesajes(fincaId);
     setGuardando(false);
+  };
+
+  const editarPesaje = async (pesaje: Pesaje) => {
+    setMensaje("");
+    setCargandoDetalle(true);
+
+    const { data, error } = await supabase
+      .from("gan_pesaje_detalles")
+      .select("numero_animal,peso")
+      .eq("pesaje_id", pesaje.id)
+      .order("numero_animal", { ascending: true });
+
+    setCargandoDetalle(false);
+
+    if (error) {
+      setMensaje(`Error al cargar el pesaje: ${error.message}`);
+      return;
+    }
+
+    if (!data || data.length === 0) {
+      setMensaje(
+        "Este pesaje fue registrado con el sistema anterior y no tiene pesos individuales para editar."
+      );
+      return;
+    }
+
+    setPesajeDetalle(null);
+    setPesajeEditandoId(pesaje.id);
+    setFecha(pesaje.fecha);
+    setLoteId(pesaje.lote_id);
+    setCantidadPesada(String(data.length));
+    setPesos(data.map((item) => String(Number(item.peso))));
+    setObservaciones(pesaje.observaciones || "");
+    setMostrarFormulario(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const eliminarPesaje = async (pesaje: Pesaje) => {
+    const nombreLote = pesaje.gan_lotes_ganado?.nombre || "este lote";
+    const confirmar = window.confirm(
+      `¿Eliminar el pesaje de ${nombreLote} del ${formatearFecha(
+        pesaje.fecha
+      )}? Esta acción también eliminará sus pesos individuales.`
+    );
+
+    if (!confirmar) return;
+
+    setMensaje("");
+
+    const { error } = await supabase.rpc("gan_eliminar_pesaje", {
+      p_pesaje_id: pesaje.id,
+    });
+
+    if (error) {
+      setMensaje(`Error al eliminar: ${error.message}`);
+      return;
+    }
+
+    if (pesajeDetalle?.id === pesaje.id) setPesajeDetalle(null);
+    if (pesajeEditandoId === pesaje.id) {
+      limpiarFormulario();
+      setMostrarFormulario(false);
+    }
+
+    setMensaje("Pesaje eliminado correctamente.");
+    await cargarPesajes(fincaId);
   };
 
   const abrirDetalle = async (pesaje: Pesaje) => {
@@ -309,11 +390,18 @@ export default function PesajesPage() {
             className={mostrarFormulario ? "boton-secundario boton-header" : "boton-principal boton-header"}
             onClick={() => {
               setMensaje("");
-              if (mostrarFormulario) limpiarFormulario();
-              setMostrarFormulario(!mostrarFormulario);
+              if (mostrarFormulario) {
+                limpiarFormulario();
+                setMostrarFormulario(false);
+              } else {
+                limpiarFormulario();
+                setMostrarFormulario(true);
+              }
             }}
           >
-            {mostrarFormulario ? "Cancelar" : "+ Registrar pesaje"}
+            {mostrarFormulario
+              ? "Cancelar"
+              : "+ Registrar pesaje"}
           </button>
         </header>
 
@@ -375,7 +463,11 @@ export default function PesajesPage() {
 
         {mostrarFormulario && (
           <form onSubmit={guardarPesaje} className="formulario">
-            <h2>Registrar pesaje individual</h2>
+            <h2>
+              {pesajeEditandoId
+                ? "Editar pesaje individual"
+                : "Registrar pesaje individual"}
+            </h2>
 
             <div className="form-grid">
               <div className="campo">
@@ -385,7 +477,12 @@ export default function PesajesPage() {
 
               <div className="campo">
                 <label>Lote *</label>
-                <select value={loteId} onChange={(e) => seleccionarLote(e.target.value)} required>
+                <select
+                  value={loteId}
+                  onChange={(e) => seleccionarLote(e.target.value)}
+                  required
+                  disabled={Boolean(pesajeEditandoId)}
+                >
                   <option value="">Seleccionar lote</option>
                   {lotes.map((lote) => (
                     <option key={lote.id} value={lote.id}>
@@ -469,7 +566,11 @@ export default function PesajesPage() {
                 Cancelar
               </button>
               <button type="submit" disabled={guardando} className="boton-principal" style={{ opacity: guardando ? 0.7 : 1 }}>
-                {guardando ? "Guardando..." : "Guardar pesaje"}
+                {guardando
+                  ? "Guardando..."
+                  : pesajeEditandoId
+                  ? "Guardar cambios"
+                  : "Guardar pesaje"}
               </button>
             </div>
           </form>
@@ -495,7 +596,7 @@ export default function PesajesPage() {
                     <thead>
                       <tr>
                         <th>Fecha</th><th>Lote</th><th>Animales</th><th>Promedio</th>
-                        <th>Mínimo</th><th>Máximo</th><th>Observaciones</th><th>Detalle</th>
+                        <th>Mínimo</th><th>Máximo</th><th>Observaciones</th><th>Acciones</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -508,7 +609,19 @@ export default function PesajesPage() {
                           <td>{pesaje.peso_minimo !== null ? `${Number(pesaje.peso_minimo).toLocaleString()} kg` : "—"}</td>
                           <td>{pesaje.peso_maximo !== null ? `${Number(pesaje.peso_maximo).toLocaleString()} kg` : "—"}</td>
                           <td>{pesaje.observaciones || "—"}</td>
-                          <td><button className="boton-detalle" onClick={() => abrirDetalle(pesaje)}>Ver detalle</button></td>
+                          <td>
+                            <div className="acciones-pesaje">
+                              <button className="boton-detalle" onClick={() => abrirDetalle(pesaje)}>
+                                Ver detalle
+                              </button>
+                              <button className="boton-editar" onClick={() => editarPesaje(pesaje)}>
+                                Editar
+                              </button>
+                              <button className="boton-eliminar" onClick={() => eliminarPesaje(pesaje)}>
+                                Eliminar
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -544,9 +657,17 @@ export default function PesajesPage() {
                       <strong>{pesaje.observaciones || "Sin observaciones"}</strong>
                     </div>
 
-                    <button className="boton-detalle boton-detalle-mobile" onClick={() => abrirDetalle(pesaje)}>
-                      Ver pesos individuales
-                    </button>
+                    <div className="acciones-mobile">
+                      <button className="boton-detalle" onClick={() => abrirDetalle(pesaje)}>
+                        Ver detalle
+                      </button>
+                      <button className="boton-editar" onClick={() => editarPesaje(pesaje)}>
+                        Editar
+                      </button>
+                      <button className="boton-eliminar" onClick={() => eliminarPesaje(pesaje)}>
+                        Eliminar
+                      </button>
+                    </div>
                   </article>
                 ))}
               </div>
@@ -563,10 +684,13 @@ export default function PesajesPage() {
         .pesajes-header { display:flex; justify-content:space-between; align-items:center; gap:20px; margin-bottom:25px; }
         .pesajes-header h1 { margin:0; font-size:28px; color:#143e28; }
         .pesajes-header p { margin:7px 0 0; color:#718078; font-size:14px; }
-        .boton-principal,.boton-secundario,.boton-detalle { border-radius:10px; padding:12px 18px; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit; }
+        .boton-principal,.boton-secundario,.boton-detalle,.boton-editar,.boton-eliminar { border-radius:10px; padding:12px 18px; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit; }
         .boton-principal { background:#176b3a; border:none; color:white; }
         .boton-secundario { background:white; border:1px solid #d7dfd9; color:#53675b; }
         .boton-detalle { border:1px solid #bfe0ca; background:#edf8f0; color:#176b3a; padding:8px 11px; white-space:nowrap; }
+        .boton-editar { border:1px solid #d7dfd9; background:white; color:#53675b; padding:8px 11px; white-space:nowrap; }
+        .boton-eliminar { border:1px solid #f0c7c7; background:#fff5f5; color:#b42318; padding:8px 11px; white-space:nowrap; }
+        .acciones-pesaje { display:flex; align-items:center; gap:6px; flex-wrap:nowrap; }
         .mensaje { padding:12px 15px; border-radius:10px; margin-bottom:20px; font-size:13px; }
         .mensaje-exito { background:#edf8f0; color:#176b3a; }
         .mensaje-error { background:#fff1f1; color:#b42318; }
@@ -581,6 +705,7 @@ export default function PesajesPage() {
         .campo { min-width:0; }
         .campo label,.observaciones label { display:block; margin-bottom:7px; color:#43594b; font-size:13px; font-weight:600; }
         .campo input,.campo select,.observaciones textarea,.entrada-peso input { width:100%; box-sizing:border-box; border:1px solid #d7dfd9; border-radius:9px; padding:11px 12px; font-size:14px; outline:none; background:white; color:#20352a; font-family:inherit; }
+        .campo select:disabled { background:#f3f6f4; color:#66776c; cursor:not-allowed; }
         .observaciones { margin-top:18px; }
         .observaciones textarea { min-height:90px; resize:vertical; }
         .form-botones { display:flex; justify-content:flex-end; gap:10px; margin-top:22px; }
@@ -680,6 +805,8 @@ export default function PesajesPage() {
           .detalle-mobile span { display:block; color:#8a9890; font-size:10px; margin-bottom:5px; }
           .detalle-mobile strong { display:block; color:#35483b; font-size:12px; line-height:1.45; font-weight:600; overflow-wrap:anywhere; }
           .boton-detalle-mobile { width:100%; margin-top:14px; min-height:43px; }
+          .acciones-mobile { display:grid; grid-template-columns:1.35fr .8fr .9fr; gap:7px; margin-top:14px; }
+          .acciones-mobile button { width:100%; min-height:42px; padding:8px 5px; font-size:11px; }
         }
 
         @media (max-width:380px) {
