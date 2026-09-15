@@ -48,6 +48,22 @@ type Combustible = {
   created_at: string;
 };
 
+type Mantenimiento = {
+  id: string;
+  maquinaria_id: string;
+  fecha: string;
+  tipo: string;
+  descripcion: string;
+  lectura_servicio: number | null;
+  costo_repuestos: number;
+  costo_mano_obra: number;
+  costo_otros: number;
+  proveedor: string | null;
+  observaciones: string | null;
+  registrado_por: string | null;
+  created_at: string;
+};
+
 export default function FichaMaquinariaPage() {
   const router = useRouter();
   const params = useParams();
@@ -63,6 +79,7 @@ export default function FichaMaquinariaPage() {
   const [maquina, setMaquina] = useState<Maquinaria | null>(null);
   const [lecturas, setLecturas] = useState<Lectura[]>([]);
   const [combustibles, setCombustibles] = useState<Combustible[]>([]);
+  const [mantenimientos, setMantenimientos] = useState<Mantenimiento[]>([]);
 
   const [mostrarLecturas, setMostrarLecturas] = useState(false);
   const [mostrarFormularioLectura, setMostrarFormularioLectura] =
@@ -72,8 +89,13 @@ export default function FichaMaquinariaPage() {
   const [mostrarFormularioCombustible, setMostrarFormularioCombustible] =
     useState(false);
 
+  const [mostrarMantenimientos, setMostrarMantenimientos] = useState(false);
+  const [mostrarFormularioMantenimiento, setMostrarFormularioMantenimiento] =
+    useState(false);
+
   const [guardandoLectura, setGuardandoLectura] = useState(false);
   const [guardandoCombustible, setGuardandoCombustible] = useState(false);
+  const [guardandoMantenimiento, setGuardandoMantenimiento] = useState(false);
 
   const [fechaLectura, setFechaLectura] = useState(
     new Date().toISOString().split("T")[0]
@@ -90,6 +112,18 @@ export default function FichaMaquinariaPage() {
   const [lecturaCombustible, setLecturaCombustible] = useState("");
   const [proveedorCombustible, setProveedorCombustible] = useState("");
   const [observacionCombustible, setObservacionCombustible] = useState("");
+
+  const [fechaMantenimiento, setFechaMantenimiento] = useState(
+    new Date().toISOString().split("T")[0]
+  );
+  const [tipoMantenimiento, setTipoMantenimiento] = useState("preventivo");
+  const [descripcionMantenimiento, setDescripcionMantenimiento] = useState("");
+  const [lecturaMantenimiento, setLecturaMantenimiento] = useState("");
+  const [costoRepuestos, setCostoRepuestos] = useState("");
+  const [costoManoObra, setCostoManoObra] = useState("");
+  const [costoOtros, setCostoOtros] = useState("");
+  const [proveedorMantenimiento, setProveedorMantenimiento] = useState("");
+  const [observacionMantenimiento, setObservacionMantenimiento] = useState("");
 
   useEffect(() => {
     if (maquinaId) {
@@ -134,6 +168,7 @@ export default function FichaMaquinariaPage() {
       await cargarMaquina(membresia.finca_id);
       await cargarLecturas();
       await cargarCombustibles();
+      await cargarMantenimientos();
     } catch (err: any) {
       console.error(err);
       setError(
@@ -204,6 +239,21 @@ export default function FichaMaquinariaPage() {
     }
 
     setCombustibles((data || []) as Combustible[]);
+  }
+
+  async function cargarMantenimientos() {
+    if (!maquinaId) return;
+
+    const { data, error: errorMantenimientos } = await supabase
+      .from("gan_mantenimientos")
+      .select("*")
+      .eq("maquinaria_id", maquinaId)
+      .order("fecha", { ascending: false })
+      .order("created_at", { ascending: false });
+
+    if (errorMantenimientos) throw errorMantenimientos;
+
+    setMantenimientos((data || []) as Mantenimiento[]);
   }
 
   function abrirLecturas() {
@@ -459,6 +509,118 @@ export default function FichaMaquinariaPage() {
     if (valor === "gnv") return "GNV";
 
     return tipo;
+  }
+
+  function abrirMantenimientos() {
+    setMostrarMantenimientos(true);
+    setMostrarFormularioMantenimiento(false);
+    setMensaje("");
+    setError("");
+  }
+
+  function cerrarMantenimientos() {
+    setMostrarMantenimientos(false);
+    setMostrarFormularioMantenimiento(false);
+    setMensaje("");
+    setError("");
+  }
+
+  function abrirNuevoMantenimiento() {
+    if (!maquina) return;
+
+    setFechaMantenimiento(new Date().toISOString().split("T")[0]);
+    setTipoMantenimiento("preventivo");
+    setDescripcionMantenimiento("");
+    setLecturaMantenimiento(
+      maquina.tipo_medicion === "ninguno" ? "" : String(maquina.lectura_actual || 0)
+    );
+    setCostoRepuestos("");
+    setCostoManoObra("");
+    setCostoOtros("");
+    setProveedorMantenimiento("");
+    setObservacionMantenimiento("");
+    setError("");
+    setMensaje("");
+    setMostrarFormularioMantenimiento(true);
+  }
+
+  async function registrarMantenimiento(e: React.FormEvent) {
+    e.preventDefault();
+    if (!maquina || !maquinaId) return;
+
+    const lectura = lecturaMantenimiento.trim() === "" ? null : Number(lecturaMantenimiento);
+    const repuestos = costoRepuestos.trim() === "" ? 0 : Number(costoRepuestos);
+    const manoObra = costoManoObra.trim() === "" ? 0 : Number(costoManoObra);
+    const otros = costoOtros.trim() === "" ? 0 : Number(costoOtros);
+
+    if (!fechaMantenimiento) return setError("Selecciona la fecha del mantenimiento.");
+    if (!tipoMantenimiento.trim()) return setError("Selecciona el tipo de mantenimiento.");
+    if (!descripcionMantenimiento.trim()) return setError("Ingresa la descripción del mantenimiento.");
+    if (lectura !== null && (Number.isNaN(lectura) || lectura < 0))
+      return setError("Ingresa una lectura válida.");
+    if (
+      maquina.tipo_medicion !== "ninguno" &&
+      lectura !== null &&
+      lectura < Number(maquina.lectura_actual || 0)
+    )
+      return setError(
+        `La lectura de servicio no puede ser menor que ${Number(
+          maquina.lectura_actual || 0
+        ).toLocaleString("es-BO")} ${unidadLectura()}.`
+      );
+    if ([repuestos, manoObra, otros].some((v) => Number.isNaN(v) || v < 0))
+      return setError("Los costos deben ser valores mayores o iguales a cero.");
+
+    try {
+      setGuardandoMantenimiento(true);
+      setError("");
+      setMensaje("");
+
+      const { error: errorRpc } = await supabase.rpc("gan_registrar_mantenimiento", {
+        p_maquinaria_id: maquinaId,
+        p_fecha: fechaMantenimiento,
+        p_tipo: tipoMantenimiento.trim(),
+        p_descripcion: descripcionMantenimiento.trim(),
+        p_lectura_servicio: lectura,
+        p_costo_repuestos: repuestos,
+        p_costo_mano_obra: manoObra,
+        p_costo_otros: otros,
+        p_proveedor: proveedorMantenimiento.trim() || null,
+        p_observaciones: observacionMantenimiento.trim() || null,
+      });
+
+      if (errorRpc) throw errorRpc;
+
+      await cargarMantenimientos();
+      setMostrarFormularioMantenimiento(false);
+      setMensaje("Mantenimiento registrado correctamente.");
+    } catch (err: any) {
+      console.error(err);
+      setError(err?.message || "No se pudo registrar el mantenimiento.");
+    } finally {
+      setGuardandoMantenimiento(false);
+    }
+  }
+
+  function costoMantenimiento(item: Mantenimiento) {
+    return (
+      Number(item.costo_repuestos || 0) +
+      Number(item.costo_mano_obra || 0) +
+      Number(item.costo_otros || 0)
+    );
+  }
+
+  function totalCostoMantenimientos() {
+    return mantenimientos.reduce((total, item) => total + costoMantenimiento(item), 0);
+  }
+
+  function etiquetaMantenimiento(tipo: string) {
+    const etiquetas: Record<string, string> = {
+      preventivo: "Preventivo",
+      correctivo: "Correctivo",
+      reparacion: "Reparación",
+    };
+    return etiquetas[tipo] || tipo;
   }
 
   function etiquetaEstado(estado: Maquinaria["estado"]) {
@@ -1211,6 +1373,161 @@ export default function FichaMaquinariaPage() {
               </section>
             )}
 
+            {mostrarMantenimientos && (
+              <section className="panel panel-mantenimiento">
+                <div className="titulo-panel">
+                  <div>
+                    <div className="eyebrow">CONTROL DE MANTENIMIENTO</div>
+                    <h2>Mantenimientos</h2>
+                    <p>Servicios, reparaciones, proveedores y costos de este equipo.</p>
+                  </div>
+                  <button type="button" className="boton-cerrar" onClick={cerrarMantenimientos}>×</button>
+                </div>
+
+                <div className="mantenimiento-resumen">
+                  <div><span>Servicios</span><strong>{mantenimientos.length}</strong></div>
+                  <div><span>Costo acumulado</span><strong>{formatearDinero(totalCostoMantenimientos())}</strong></div>
+                  <div>
+                    <span>Último servicio</span>
+                    <strong>{mantenimientos.length ? formatearFecha(mantenimientos[0].fecha) : "—"}</strong>
+                  </div>
+                  <button type="button" className="boton-principal" onClick={abrirNuevoMantenimiento}>
+                    + Registrar mantenimiento
+                  </button>
+                </div>
+
+                {mostrarFormularioMantenimiento && (
+                  <form className="form-mantenimiento" onSubmit={registrarMantenimiento}>
+                    <div className="form-mantenimiento-grid">
+                      <label>
+                        <span>Fecha *</span>
+                        <input type="date" value={fechaMantenimiento}
+                          onChange={(e) => setFechaMantenimiento(e.target.value)} required />
+                      </label>
+
+                      <label>
+                        <span>Tipo *</span>
+                        <select value={tipoMantenimiento}
+                          onChange={(e) => setTipoMantenimiento(e.target.value)}>
+                          <option value="preventivo">Preventivo</option>
+                          <option value="correctivo">Correctivo</option>
+                          <option value="reparacion">Reparación</option>
+                        </select>
+                      </label>
+
+                      <label className="campo-completo">
+                        <span>Descripción *</span>
+                        <input type="text" value={descripcionMantenimiento}
+                          onChange={(e) => setDescripcionMantenimiento(e.target.value)}
+                          placeholder="Ej. Cambio de aceite y filtros" required />
+                      </label>
+
+                      {maquina.tipo_medicion !== "ninguno" && (
+                        <label>
+                          <span>{maquina.tipo_medicion === "horas" ? "Horómetro del servicio" : "Kilometraje del servicio"}</span>
+                          <div className="input-unidad">
+                            <input type="number" min={Number(maquina.lectura_actual || 0)} step="0.01"
+                              inputMode="decimal" value={lecturaMantenimiento}
+                              onChange={(e) => setLecturaMantenimiento(e.target.value)} />
+                            <span>{unidadLectura()}</span>
+                          </div>
+                        </label>
+                      )}
+
+                      <label>
+                        <span>Costo repuestos</span>
+                        <input type="number" min="0" step="0.01" inputMode="decimal"
+                          value={costoRepuestos} onChange={(e) => setCostoRepuestos(e.target.value)}
+                          placeholder="0.00" />
+                      </label>
+
+                      <label>
+                        <span>Mano de obra</span>
+                        <input type="number" min="0" step="0.01" inputMode="decimal"
+                          value={costoManoObra} onChange={(e) => setCostoManoObra(e.target.value)}
+                          placeholder="0.00" />
+                      </label>
+
+                      <label>
+                        <span>Otros costos</span>
+                        <input type="number" min="0" step="0.01" inputMode="decimal"
+                          value={costoOtros} onChange={(e) => setCostoOtros(e.target.value)}
+                          placeholder="0.00" />
+                      </label>
+
+                      <label>
+                        <span>Proveedor / taller</span>
+                        <input type="text" value={proveedorMantenimiento}
+                          onChange={(e) => setProveedorMantenimiento(e.target.value)}
+                          placeholder="Ej. Taller agrícola" />
+                      </label>
+
+                      <label className="campo-completo">
+                        <span>Observaciones</span>
+                        <textarea value={observacionMantenimiento}
+                          onChange={(e) => setObservacionMantenimiento(e.target.value)}
+                          rows={3} placeholder="Detalles adicionales del servicio." />
+                      </label>
+                    </div>
+
+                    <div className="acciones-form">
+                      <button type="button" className="boton-secundario"
+                        onClick={() => setMostrarFormularioMantenimiento(false)}
+                        disabled={guardandoMantenimiento}>Cancelar</button>
+                      <button type="submit" className="boton-principal" disabled={guardandoMantenimiento}>
+                        {guardandoMantenimiento ? "Guardando..." : "Guardar mantenimiento"}
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                <div className="historial-cabecera">
+                  <h3>Historial de mantenimientos</h3>
+                  <span>{mantenimientos.length} {mantenimientos.length === 1 ? "registro" : "registros"}</span>
+                </div>
+
+                {mantenimientos.length === 0 ? (
+                  <div className="sin-lecturas">
+                    <div>🔧</div>
+                    <strong>No hay mantenimientos registrados todavía</strong>
+                    <p>Registra el primer servicio para comenzar el historial.</p>
+                  </div>
+                ) : (
+                  <div className="tabla-contenedor">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Fecha</th><th>Tipo</th><th>Descripción</th><th>Lectura</th>
+                          <th>Repuestos</th><th>Mano de obra</th><th>Otros</th>
+                          <th>Total</th><th>Proveedor</th><th>Observación</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {mantenimientos.map((item) => (
+                          <tr key={item.id}>
+                            <td data-label="Fecha">{formatearFecha(item.fecha)}</td>
+                            <td data-label="Tipo">{etiquetaMantenimiento(item.tipo)}</td>
+                            <td data-label="Descripción"><strong>{item.descripcion}</strong></td>
+                            <td data-label="Lectura">
+                              {item.lectura_servicio === null || item.lectura_servicio === undefined
+                                ? "—"
+                                : `${Number(item.lectura_servicio).toLocaleString("es-BO")} ${unidadLectura()}`}
+                            </td>
+                            <td data-label="Repuestos">{formatearDinero(Number(item.costo_repuestos || 0))}</td>
+                            <td data-label="Mano de obra">{formatearDinero(Number(item.costo_mano_obra || 0))}</td>
+                            <td data-label="Otros">{formatearDinero(Number(item.costo_otros || 0))}</td>
+                            <td data-label="Total"><strong>{formatearDinero(costoMantenimiento(item))}</strong></td>
+                            <td data-label="Proveedor">{item.proveedor || "—"}</td>
+                            <td data-label="Observación">{item.observaciones || "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </section>
+            )}
+
             <section className="panel">
               <div className="titulo-panel">
                 <div>
@@ -1280,11 +1597,24 @@ export default function FichaMaquinariaPage() {
                   <span className="disponible">Abrir →</span>
                 </button>
 
-                <Modulo
-                  icono="🔧"
-                  titulo="Mantenimientos"
-                  descripcion="Servicios, reparaciones y costos."
-                />
+                <button
+                  type="button"
+                  className="modulo modulo-activo"
+                  onClick={abrirMantenimientos}
+                >
+                  <div className="modulo-icono">🔧</div>
+                  <div className="modulo-texto">
+                    <strong>Mantenimientos</strong>
+                    <p>
+                      {mantenimientos.length === 0
+                        ? "Servicios, reparaciones y costos."
+                        : `${mantenimientos.length} ${
+                            mantenimientos.length === 1 ? "servicio" : "servicios"
+                          } · ${formatearDinero(totalCostoMantenimientos())}`}
+                    </p>
+                  </div>
+                  <span className="disponible">Abrir →</span>
+                </button>
 
                 <Modulo
                   icono="📅"
@@ -1590,6 +1920,10 @@ const estilos = `
     border-top: 4px solid #2d7545;
   }
 
+  .panel-mantenimiento {
+    border-top: 4px solid #2d7545;
+  }
+
   .titulo-panel {
     display: flex;
     align-items: flex-start;
@@ -1869,6 +2203,89 @@ const estilos = `
 
   .form-combustible input:focus,
   .form-combustible textarea:focus {
+    border-color: #3c8656;
+    box-shadow: 0 0 0 3px rgba(60, 134, 86, 0.09);
+  }
+
+  .mantenimiento-resumen {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+    align-items: center;
+    gap: 12px;
+    background: #f4f8f5;
+    border: 1px solid #e0e9e2;
+    border-radius: 13px;
+    padding: 17px;
+    margin-bottom: 17px;
+  }
+
+  .mantenimiento-resumen span {
+    display: block;
+    color: #738078;
+    font-size: 11px;
+  }
+
+  .mantenimiento-resumen strong {
+    display: block;
+    color: #173d27;
+    font-size: 20px;
+    margin-top: 4px;
+    overflow-wrap: anywhere;
+  }
+
+  .form-mantenimiento {
+    border: 1px solid #dce6de;
+    background: #fbfcfb;
+    border-radius: 13px;
+    padding: 17px;
+    margin-bottom: 20px;
+  }
+
+  .form-mantenimiento-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .form-mantenimiento label {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .form-mantenimiento label > span {
+    color: #405046;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .form-mantenimiento input,
+  .form-mantenimiento select,
+  .form-mantenimiento textarea {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #ccd6ce;
+    border-radius: 9px;
+    background: white;
+    color: #1e2e23;
+    padding: 10px 11px;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+  }
+
+  .form-mantenimiento input,
+  .form-mantenimiento select {
+    min-height: 42px;
+  }
+
+  .form-mantenimiento textarea {
+    resize: vertical;
+  }
+
+  .form-mantenimiento input:focus,
+  .form-mantenimiento select:focus,
+  .form-mantenimiento textarea:focus {
     border-color: #3c8656;
     box-shadow: 0 0 0 3px rgba(60, 134, 86, 0.09);
   }
@@ -2183,23 +2600,31 @@ const estilos = `
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
-    .combustible-resumen .boton-principal {
+    .combustible-resumen .boton-principal,
+    .mantenimiento-resumen .boton-principal {
       grid-column: 1 / -1;
       width: 100%;
+    }
+
+    .mantenimiento-resumen {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
   }
 
   @media (max-width: 600px) {
     .form-lectura-grid,
-    .form-combustible-grid {
+    .form-combustible-grid,
+    .form-mantenimiento-grid {
       grid-template-columns: 1fr;
     }
 
-    .combustible-resumen {
+    .combustible-resumen,
+    .mantenimiento-resumen {
       grid-template-columns: 1fr;
     }
 
-    .combustible-resumen .boton-principal {
+    .combustible-resumen .boton-principal,
+    .mantenimiento-resumen .boton-principal {
       grid-column: auto;
     }
 
