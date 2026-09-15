@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Sidebar from "../components/Sidebar";
 import { supabase } from "../../lib/supabase";
 
@@ -58,7 +58,6 @@ const formularioInicial: FormularioMaquinaria = {
 
 export default function MaquinariaPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
@@ -78,18 +77,6 @@ export default function MaquinariaPage() {
   useEffect(() => {
     iniciar();
   }, []);
-
-  useEffect(() => {
-    const idEditar = searchParams.get("editar");
-
-    if (!cargando && idEditar && maquinarias.length > 0) {
-      const maquina = maquinarias.find((item) => item.id === idEditar);
-
-      if (maquina) {
-        editarMaquina(maquina);
-      }
-    }
-  }, [cargando, maquinarias, searchParams]);
 
   async function iniciar() {
     try {
@@ -127,7 +114,34 @@ export default function MaquinariaPage() {
       }
 
       setFincaId(membresia.finca_id);
-      await cargarMaquinaria(membresia.finca_id);
+
+      const { data: datosMaquinaria, error: errorMaquinaria } = await supabase
+        .from("gan_maquinaria")
+        .select("*")
+        .eq("finca_id", membresia.finca_id)
+        .order("nombre", { ascending: true });
+
+      if (errorMaquinaria) {
+        throw errorMaquinaria;
+      }
+
+      const listaMaquinaria = (datosMaquinaria || []) as Maquinaria[];
+      setMaquinarias(listaMaquinaria);
+
+      const idEditar =
+        typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search).get("editar")
+          : null;
+
+      if (idEditar) {
+        const maquinaEditar = listaMaquinaria.find(
+          (item) => item.id === idEditar
+        );
+
+        if (maquinaEditar) {
+          editarMaquina(maquinaEditar);
+        }
+      }
     } catch (err: any) {
       console.error(err);
       setError(err?.message || "No se pudo cargar Maquinaria.");
